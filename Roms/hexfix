@@ -15,20 +15,20 @@
 #
 
 import re
-
-infile = "callan13.dis"
+import sys
 
 # split on #, then on ,
 def process ( thing ) :
     t = thing.split("#")
     tt = t[1].split(',')
 
+    h = tt[0]
     ival = int(tt[0])
-    h = hex(ival)
-
-    # strip silly leading "-"
-    if h[0] == '-' :
-        h = h[1:]
+    if ival < -9 or ival > 9 :
+        h = hex(ival)
+        # strip silly leading "-"
+        if h[0] == '-' :
+            h = h[1:]
 
     #print ( tt[0] )
     #print ( h )
@@ -49,6 +49,10 @@ def scan ( line ) :
     # in that case.  And they are at the end of the
     # line as in:  linkw %fp,#-4
     if "linkw" in line :
+        return debug ( line )
+
+    # this is typically trap #7 or some such
+    if "trap" in line :
         return debug ( line )
 
     # Python is happy either way.
@@ -75,9 +79,28 @@ def scan ( line ) :
 
     return "\t".join(lt)
 
+# This is to fix ridiculous long strings
+# of leading zeros like the following:
+#   movel %a1@(0000000000000032,%d2:l:8),%d0
+#   movel %a0@(0000000000000000,%d7:l),%d0
+
+def scan2 ( line ) :
+    l1 = re.sub ( '\(0+(\d)', '(\\1', line, 4 )
+    l2 = re.sub ( '\(0+', '(', l1, 4 )
+    return l2
+
+# infile = "callan13.dis"
+
+if len(sys.argv) != 2 :
+    print ( "usage: hexfix infile" )
+    exit ()
+
+infile = sys.argv[1]
+#print ( infile )
+
 with open ( infile ) as f:
     for line in f:
-        fix = scan ( line.rstrip() )
-        if fix != None :
-            print ( fix )
+        fix1 = scan ( line.rstrip() )
+        fix2 = scan2 ( fix1 )
+        print ( fix2 )
 
