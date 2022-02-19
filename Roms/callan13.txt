@@ -57,6 +57,7 @@ Disassembly of section .text:
   200098:	6764           	beqs 0x2000fe
   20009a:	23fc 0000 0001 	movel #1,0x266
   2000a0:	0000 0266
+
   2000a4:	201f           	movel %sp@+,%d0
   2000a6:	13fc 0010 0060 	moveb #0x10,0x600002
   2000ac:	0002
@@ -69,27 +70,39 @@ Disassembly of section .text:
   2000b6:	0002
   2000b8:	33fc ff5f 0080 	movew #0xa1,0x800002
   2000be:	0002
+
+; This is odd.  Here we jump to a code fragment at the
+; end of the ROM, which jumps back to "c8" below.
+; like a classic "binary patch" for some reason.
+
   2000c0:	4ef9 0020 1ed6 	jmp 0x201ed6
   2000c6:	4e71           	nop
+
+; set d5 = 0 and enter loop below
   2000c8:	4285           	clrl %d5
   2000ca:	6054           	bras 0x200120
-  2000cc:	2005           	movel %d5,%d0
-  2000ce:	720c           	moveq #0xc,%d1
+
+; start loop
+  2000cc:	2005           	movel %d5,%d0		; d0 = d5
+  2000ce:	720c           	moveq #0xc,%d1		; d1 = 0xc
   2000d0:	e3a0           	asll %d1,%d0
   2000d2:	33c0 00e0 0000 	movew %d0,0xe00000	; context reg
-  2000d8:	4286           	clrl %d6
-  2000da:	0c86 0000 0040 	cmpil #0x40,%d6
+  2000d8:	4286           	clrl %d6		; d6 = 0
+
+; internal loop
+  2000da:	0c86 0000 0040 	cmpil #0x40,%d6		; limit to 64 passes
   2000e0:	6c3c           	bges 0x20011e
-  2000e2:	2006           	movel %d6,%d0
-  2000e4:	0080 0000 0f00 	oril #0xf00,%d0
-  2000ea:	2206           	movel %d6,%d1
-  2000ec:	740f           	moveq #0xf,%d2
+  2000e2:	2006           	movel %d6,%d0		; d0 = d6
+  2000e4:	0080 0000 0f00 	oril #0xf00,%d0		; d0 |= 0xf00
+  2000ea:	2206           	movel %d6,%d1		; d1 = d6
+  2000ec:	740f           	moveq #0xf,%d2		; d2 = 0xf
   2000ee:	e5a1           	asll %d2,%d1
   2000f0:	0681 00c0 0000 	addil #0xc00000,%d1	; seg map
   2000f6:	2041           	moveal %d1,%a0
   2000f8:	3080           	movew %d0,%a0@
-  2000fa:	5286           	addql #1,%d6
+  2000fa:	5286           	addql #1,%d6		; d6++
   2000fc:	60dc           	bras 0x2000da
+
   2000fe:	4ab9 0000 0266 	tstl 0x266
   200104:	679e           	beqs 0x2000a4
   200106:	42b9 0000 0266 	clrl 0x266
@@ -98,23 +111,28 @@ Disassembly of section .text:
   200114:	201f           	movel %sp@+,%d0
   200116:	3f3c 0001      	movew #1,%sp@-
   20011a:	6000 01ea      	braw 0x200306
+
   20011e:	5285           	addql #1,%d5
-  200120:	0c85 0000 0010 	cmpil #0x10,%d5
+  200120:	0c85 0000 0010 	cmpil #0x10,%d5		; limit to 16 passes
   200126:	6da4           	blts 0x2000cc		; loop
 
+; Now set up the page map
+
   200128:	4279 00e0 0000 	clrw 0xe00000		; zero the context register
-  20012e:	4286           	clrl %d6
+  20012e:	4286           	clrl %d6		; d6 = 0
   200130:	601a           	bras 0x20014c
-  200132:	2006           	movel %d6,%d0
-  200134:	0080 0000 0000 	oril #0,%d0
-  20013a:	2206           	movel %d6,%d1
-  20013c:	740b           	moveq #0xb,%d2
+
+; start loop
+  200132:	2006           	movel %d6,%d0		; d0 = d6
+  200134:	0080 0000 0000 	oril #0,%d0		; d0 |= 0 ??
+  20013a:	2206           	movel %d6,%d1		; d1 = d6
+  20013c:	740b           	moveq #0xb,%d2		; d2 = 0xb
   20013e:	e5a1           	asll %d2,%d1
   200140:	0681 00a0 0000 	addil #0xa00000,%d1	; page map
   200146:	2041           	moveal %d1,%a0
   200148:	3080           	movew %d0,%a0@
-  20014a:	5286           	addql #1,%d6
-  20014c:	0c86 0000 0400 	cmpil #0x400,%d6
+  20014a:	5286           	addql #1,%d6		; d6++
+  20014c:	0c86 0000 0400 	cmpil #0x400,%d6	; limit to 1024 passes
   200152:	6dde           	blts 0x200132
 
   200154:	33fc 0001 0020 	movew #1,0x200000	; ?? how can this work
@@ -127,9 +145,11 @@ Disassembly of section .text:
   200170:	2e00           	movel %d0,%d7
   200172:	287c 0000 0000 	moveal #0,%a4
   200178:	6006           	bras 0x200180
+
   20017a:	28fc ffff ffff 	movel #-1,%a4@+
   200180:	b9c7           	cmpal %d7,%a4
   200182:	65f6           	bcss 0x20017a
+
   200184:	267c 0000 0200 	moveal #0x200,%a3
   20018a:	2747 0078      	movel %d7,%a3@(120)
   20018e:	42ab 007c      	clrl %a3@(124)
@@ -1251,6 +1271,8 @@ Disassembly of section .text:
   2010e2:	4cee 38f8 ffe0 	moveml %fp@(-32),%d3-%d7/%a3-%a5
   2010e8:	4e5e           	unlk %fp
   2010ea:	4e75           	rts
+
+; subroutine
   2010ec:	4e56 fff0      	linkw %fp,#-16
   2010f0:	48ee 00e4 fff0 	moveml %d2/%d5-%d7,%fp@(-16)
   2010f6:	2c3c 0000 0400 	movel #0x400,%d6
@@ -1279,7 +1301,7 @@ Disassembly of section .text:
   201138:	2007           	movel %d7,%d0
   20113a:	720b           	moveq #0xb,%d1
   20113c:	e3a0           	asll %d1,%d0
-  20113e:	0680 00a0 0000 	addil #0xa00000,%d0
+  20113e:	0680 00a0 0000 	addil #0xa00000,%d0	; page map
   201144:	2040           	moveal %d0,%a0
   201146:	30bc 1000      	movew #0x1000,%a0@
   20114a:	5287           	addql #1,%d7
@@ -1293,7 +1315,7 @@ Disassembly of section .text:
   201162:	0681 0000 0200 	addil #0x200,%d1
   201168:	740b           	moveq #0xb,%d2
   20116a:	e5a1           	asll %d2,%d1
-  20116c:	0681 00a0 0000 	addil #0xa00000,%d1
+  20116c:	0681 00a0 0000 	addil #0xa00000,%d1	; page map
   201172:	2041           	moveal %d1,%a0
   201174:	3080           	movew %d0,%a0@
   201176:	5285           	addql #1,%d5
@@ -1307,7 +1329,7 @@ Disassembly of section .text:
   20118e:	0681 0000 03e0 	addil #0x3e0,%d1
   201194:	740b           	moveq #0xb,%d2
   201196:	e5a1           	asll %d2,%d1
-  201198:	0681 00a0 0000 	addil #0xa00000,%d1
+  201198:	0681 00a0 0000 	addil #0xa00000,%d1	; page map
   20119e:	2041           	moveal %d1,%a0
   2011a0:	3080           	movew %d0,%a0@
   2011a2:	5285           	addql #1,%d5
@@ -1317,6 +1339,8 @@ Disassembly of section .text:
   2011ae:	4cee 00e4 fff0 	moveml %fp@(-16),%d2/%d5-%d7
   2011b4:	4e5e           	unlk %fp
   2011b6:	4e75           	rts
+
+; subroutine
   2011b8:	4e56 fffc      	linkw %fp,#-4
   2011bc:	48ee 0000 fffc 	moveml #0,%fp@(-4)
   2011c2:	2f3c 0020 1e68 	movel #0x201e68,%sp@-
@@ -1329,6 +1353,7 @@ Disassembly of section .text:
   2011da:	4e90           	jsr %a0@
   2011dc:	4e5e           	unlk %fp
   2011de:	4e75           	rts
+
   2011e0:	4e56 fde4      	linkw %fp,#-540
   2011e4:	48ee 0040 fde4 	moveml %d6,%fp@(-540)
   2011ea:	486e fde8      	pea %fp@(-536)
@@ -2114,63 +2139,76 @@ Disassembly of section .text:
   201c82:	4cee 2080 fff4 	moveml %fp@(-12),%d7/%a5
   201c88:	4e5e           	unlk %fp
   201c8a:	4e75           	rts
-  201c8c:	3031 3233      	movew %a1@(33,%d3:w:2),%d0
-  201c90:	3435 3637      	movew %a5@(37,%d3:w:8),%d2
-  201c94:	3839 4142 4344 	movew 0x41424344,%d4
-  201c9a:	4546           	.short 0x4546
-  201c9c:	0000 4430      	orib #0x30,%d0
-  201ca0:	0044 3100      	oriw #0x3100,%d4
-  201ca4:	4432 0044      	negb %a2@(44,%d0:w)
-  201ca8:	3300           	movew %d0,%a1@-
-  201caa:	4434 0044      	negb %a4@(44,%d0:w)
+
+; A block of text follows:
+
+; 00001c80 2007 4cee 2080 fff4 4e5e 4e75 3031 3233     L     N^Nu0123
+; 00001c90 3435 3637 3839 4142 4344 4546 0000 4430   456789ABCDEF  D0
+; 00001ca0 0044 3100 4432 0044 3300 4434 0044 3500    D1 D2 D3 D4 D5 
+; 00001cb0 4436 0044 3700 4130 0041 3100 4132 0041   D6 D7 A0 A1 A2 A
+; 00001cc0 3300 4134 0041 3500 4136 0053 5300 5553   3 A4 A5 A6 SS US
+; 00001cd0 0053 5200 5043 0000 0020 0a42 0020 0a7a    SR PC     B   z
+
+  201c8c:	3031 3233      	"0123"
+  201c90:	3435 3637      	"4567"
+  201c94:	3839 4142 4344 	"89ABCD"
+  201c9a:	4546           	"EF"
+  201c9c:	0000 4430      	"D0"
+  201ca0:	0044 3100
+  201ca4:	4432 0044
+  201ca8:	3300
+  201caa:	4434 0044
   201cae:	3500           	movew %d0,%a2@-
-  201cb0:	4436 0044      	negb %fp@(44,%d0:w)
+  201cb0:	4436 0044
   201cb4:	3700           	movew %d0,%a3@-
-  201cb6:	4130 0041      	chkl %a0@(41,%d0:w),%d0
+  201cb6:	4130 0041
   201cba:	3100           	movew %d0,%a0@-
-  201cbc:	4132 0041      	chkl %a2@(41,%d0:w),%d0
+  201cbc:	4132 0041
   201cc0:	3300           	movew %d0,%a1@-
-  201cc2:	4134 0041      	chkl %a4@(41,%d0:w),%d0
+  201cc2:	4134 0041
   201cc6:	3500           	movew %d0,%a2@-
-  201cc8:	4136 0053      	chkl %fp@(53,%d0:w),%d0
+  201cc8:	4136 0053
   201ccc:	5300           	subqb #1,%d0
   201cce:	5553           	subqw #2,%a3@
-  201cd0:	0053 5200      	oriw #0x5200,%a3@
-  201cd4:	5043           	addqw #8,%d3
-  201cd6:	0000 0020      	orib #0x20,%d0
-  201cda:	0a42 0020      	eoriw #0x20,%d2
-  201cde:	0a7a           	.short 0x0a7a
-  201ce0:	0020 0a8a      	orib #0x76,%a0@-
-  201ce4:	0020 0b6e      	orib #0x6e,%a0@-
-  201ce8:	0020 0a9c      	orib #0x64,%a0@-
-  201cec:	0020 0acc      	orib #0x34,%a0@-
-  201cf0:	0020 0aec      	orib #0x14,%a0@-
-  201cf4:	0020 0af4      	orib #0xc,%a0@-
-  201cf8:	0020 0bd4      	orib #0x2c,%a0@-
-  201cfc:	0020 0be6      	orib #0x1a,%a0@-
-  201d00:	0020 0bec      	orib #0x14,%a0@-
-  201d04:	0020 0c10      	orib #0x10,%a0@-
-  201d08:	0020 0c1c      	orib #0x1c,%a0@-
-  201d0c:	0020 0c4e      	orib #0x4e,%a0@-
-  201d10:	0020 0c6c      	orib #0x6c,%a0@-
-  201d14:	0020 0c86      	orib #0x7a,%a0@-
-  201d18:	0020 0c90      	orib #0x70,%a0@-
-  201d1c:	0020 0df8      	orib #-8,%a0@-
-  201d20:	0020 0caa      	orib #0x56,%a0@-
-  201d24:	0020 0cb6      	orib #0x4a,%a0@-
-  201d28:	0020 0cbe      	orib #0x42,%a0@-
-  201d2c:	0020 0d14      	orib #0x14,%a0@-
-  201d30:	0020 0d3c      	orib #0x3c,%a0@-
-  201d34:	0020 0d6e      	orib #0x6e,%a0@-
-  201d38:	0020 0df8      	orib #-8,%a0@-
-  201d3c:	0020 0dc4      	orib #0x3c,%a0@-
-  201d40:	0020 0dd2      	orib #0x2e,%a0@-
-  201d44:	0020 0df8      	orib #-8,%a0@-
-  201d48:	0020 0df8      	orib #-8,%a0@-
-  201d4c:	0020 0df8      	orib #-8,%a0@-
-  201d50:	0020 0df8      	orib #-8,%a0@-
-  201d54:	0020 0dec      	orib #0x14,%a0@-
-  201d58:	0820 0800      	btst #0,%a0@-
+  201cd0:	0053 5200      	"SR"
+  201cd4:	5043           	"PC"
+  201cd6:	0000
+
+; big jump table
+  201cd8:	0020 0a42
+  201cdc:	0020 0a7a
+  201ce0:	0020 0a8a
+  201ce4:	0020 0b6e
+  201ce8:	0020 0a9c
+  201cec:	0020 0acc
+  201cf0:	0020 0aec
+  201cf4:	0020 0af4
+  201cf8:	0020 0bd4
+  201cfc:	0020 0be6
+  201d00:	0020 0bec
+  201d04:	0020 0c10
+  201d08:	0020 0c1c
+  201d0c:	0020 0c4e
+  201d10:	0020 0c6c
+  201d14:	0020 0c86
+  201d18:	0020 0c90
+  201d1c:	0020 0df8
+  201d20:	0020 0caa
+  201d24:	0020 0cb6
+  201d28:	0020 0cbe
+  201d2c:	0020 0d14
+  201d30:	0020 0d3c
+  201d34:	0020 0d6e
+  201d38:	0020 0df8
+  201d3c:	0020 0dc4
+  201d40:	0020 0dd2
+  201d44:	0020 0df8
+  201d48:	0020 0df8
+  201d4c:	0020 0df8
+  201d50:	0020 0df8
+  201d54:	0020 0dec
+  201d58:	0820 0800
+
   201d5c:	3f20           	movew %a0@-,%sp@-
   201d5e:	003a           	.short 0x003a
   201d60:	2000           	movel %d0,%d0
@@ -2313,6 +2351,8 @@ Disassembly of section .text:
   201ed0:	4a00           	tstb %d0
   201ed2:	67f6           	beqs 0x201eca
   201ed4:	4e75           	rts
+
+
   201ed6:	33fc ff01 0080 	movew #0xff,0x800002
   201edc:	0002
   201ede:	33fc ffef 0080 	movew #0x11,0x800002
@@ -2322,133 +2362,55 @@ Disassembly of section .text:
   201eee:	33fc ff17 0080 	movew #0xe9,0x800002
   201ef4:	0002
   201ef6:	4ef9 0020 00c8 	jmp 0x2000c8
+
+; a plain "odx" dump to help with this section
+00001c80 2007 4cee 2080 fff4 4e5e 4e75 3031 3233     L     N^Nu0123
+00001c90 3435 3637 3839 4142 4344 4546 0000 4430   456789ABCDEF  D0
+00001ca0 0044 3100 4432 0044 3300 4434 0044 3500    D1 D2 D3 D4 D5 
+00001cb0 4436 0044 3700 4130 0041 3100 4132 0041   D6 D7 A0 A1 A2 A
+00001cc0 3300 4134 0041 3500 4136 0053 5300 5553   3 A4 A5 A6 SS US
+00001cd0 0053 5200 5043 0000 0020 0a42 0020 0a7a    SR PC     B   z
+00001ce0 0020 0a8a 0020 0b6e 0020 0a9c 0020 0acc          n        
+00001cf0 0020 0aec 0020 0af4 0020 0bd4 0020 0be6                   
+00001d00 0020 0bec 0020 0c10 0020 0c1c 0020 0c4e                  N
+00001d10 0020 0c6c 0020 0c86 0020 0c90 0020 0df8      l            
+00001d20 0020 0caa 0020 0cb6 0020 0cbe 0020 0d14                   
+00001d30 0020 0d3c 0020 0d6e 0020 0df8 0020 0dc4      <   n        
+00001d40 0020 0dd2 0020 0df8 0020 0df8 0020 0df8                   
+00001d50 0020 0df8 0020 0dec 0820 0800 3f20 003a               ?  :
+00001d60 2000 3a20 003a 2000 4272 6561 6b3a 2000     :  :  Break:  
+00001d70 0a42 7265 616b 2061 7420 0055 6e6b 6e6f    Break at  Unkno
+00001d80 776e 206d 6f64 650a 0020 6279 7465 7320   wn mode   bytes 
+00001d90 6f66 206d 656d 6f72 790a 000a 4162 6f72   of memory   Abor
+00001da0 7400 0a54 7261 6365 2074 7261 7000 4275   t  Trace trap Bu
+00001db0 7300 4164 6472 6573 7300 2045 7272 6f72   s Address  Error
+00001dc0 2c20 6164 6472 3a20 0020 6174 2000 0a45   , addr:   at   E
+00001dd0 7863 6570 7469 6f6e 3a20 003e 0053 6567   xception:  > Seg
+00001de0 4d61 7020 0050 6167 654d 6170 2000 5768   Map  PageMap  Wh
+00001df0 6174 3f0a 0000 0000 0020 10ca 0020 10c4   at?             
+00001e00 0020 1090 0020 1062 0020 10d8 0020 103a          b       :
+00001e10 0020 1048 0020 104e 0020 10d2 0020 1058      H   N       X
+00001e20 1818 0200 0444 03c1 05ea 0100 0020 1e2c        D         ,
+00001e30 000d 001a 0068 01a0 0034 00d0 046b 000d        h   4   k  
+00001e40 504d 3638 6b20 4d6f 6e69 746f 722c 2056   PM68k Monitor, V
+00001e50 6572 7369 6f6e 2031 2e32 202d 2000 0000   ersion 1.2 -    
+00001e60 202d 2030 7800 0000 6d6f 6e68 656c 7032    - 0x   monhelp2
+00001e70 0000 0000 5469 6d65 6f75 740a 0000 0000       Timeout     
+00001e80 ffff ffff ffff ffff ffff ffff ffff ffff                   
+00001e90 0cb9 2e7c 0001 0040 0000 6606 4ef9 0020     .|   @  f N   
+00001ea0 00a4 1039 0060 0002 4ef9 0020 0092 42ab      9 `  N     B 
+00001eb0 0070 42ab 006c 0cb9 2e7c 0001 0040 0000    pB  l  .|   @  
+00001ec0 6606 4eb9 0040 0000 4e75 4eb9 0020 0ed2   f N  @  NuN     
+00001ed0 4a00 67f6 4e75 33fc ff01 0080 0002 33fc   J g Nu3       3 
+00001ee0 ffef 0080 0002 33fc ffdf 0080 0002 33fc         3       3 
+00001ef0 ff17 0080 0002 4ef9 0020 00c8 ffff ffff         N         
+
+; the rest of the ROM is unused.
   201efc:	ffff           	.short 0xffff
   201efe:	ffff           	.short 0xffff
-  201f00:	ffff           	.short 0xffff
-  201f02:	ffff           	.short 0xffff
-  201f04:	ffff           	.short 0xffff
-  201f06:	ffff           	.short 0xffff
-  201f08:	ffff           	.short 0xffff
-  201f0a:	ffff           	.short 0xffff
-  201f0c:	ffff           	.short 0xffff
-  201f0e:	ffff           	.short 0xffff
-  201f10:	ffff           	.short 0xffff
-  201f12:	ffff           	.short 0xffff
-  201f14:	ffff           	.short 0xffff
-  201f16:	ffff           	.short 0xffff
-  201f18:	ffff           	.short 0xffff
-  201f1a:	ffff           	.short 0xffff
-  201f1c:	ffff           	.short 0xffff
-  201f1e:	ffff           	.short 0xffff
-  201f20:	ffff           	.short 0xffff
-  201f22:	ffff           	.short 0xffff
-  201f24:	ffff           	.short 0xffff
-  201f26:	ffff           	.short 0xffff
-  201f28:	ffff           	.short 0xffff
-  201f2a:	ffff           	.short 0xffff
-  201f2c:	ffff           	.short 0xffff
-  201f2e:	ffff           	.short 0xffff
-  201f30:	ffff           	.short 0xffff
-  201f32:	ffff           	.short 0xffff
-  201f34:	ffff           	.short 0xffff
-  201f36:	ffff           	.short 0xffff
-  201f38:	ffff           	.short 0xffff
-  201f3a:	ffff           	.short 0xffff
-  201f3c:	ffff           	.short 0xffff
-  201f3e:	ffff           	.short 0xffff
-  201f40:	ffff           	.short 0xffff
-  201f42:	ffff           	.short 0xffff
-  201f44:	ffff           	.short 0xffff
-  201f46:	ffff           	.short 0xffff
-  201f48:	ffff           	.short 0xffff
-  201f4a:	ffff           	.short 0xffff
-  201f4c:	ffff           	.short 0xffff
-  201f4e:	ffff           	.short 0xffff
-  201f50:	ffff           	.short 0xffff
-  201f52:	ffff           	.short 0xffff
-  201f54:	ffff           	.short 0xffff
-  201f56:	ffff           	.short 0xffff
-  201f58:	ffff           	.short 0xffff
-  201f5a:	ffff           	.short 0xffff
-  201f5c:	ffff           	.short 0xffff
-  201f5e:	ffff           	.short 0xffff
-  201f60:	ffff           	.short 0xffff
-  201f62:	ffff           	.short 0xffff
-  201f64:	ffff           	.short 0xffff
-  201f66:	ffff           	.short 0xffff
-  201f68:	ffff           	.short 0xffff
-  201f6a:	ffff           	.short 0xffff
-  201f6c:	ffff           	.short 0xffff
-  201f6e:	ffff           	.short 0xffff
-  201f70:	ffff           	.short 0xffff
-  201f72:	ffff           	.short 0xffff
-  201f74:	ffff           	.short 0xffff
-  201f76:	ffff           	.short 0xffff
-  201f78:	ffff           	.short 0xffff
-  201f7a:	ffff           	.short 0xffff
-  201f7c:	ffff           	.short 0xffff
-  201f7e:	ffff           	.short 0xffff
-  201f80:	ffff           	.short 0xffff
-  201f82:	ffff           	.short 0xffff
-  201f84:	ffff           	.short 0xffff
-  201f86:	ffff           	.short 0xffff
-  201f88:	ffff           	.short 0xffff
-  201f8a:	ffff           	.short 0xffff
-  201f8c:	ffff           	.short 0xffff
-  201f8e:	ffff           	.short 0xffff
-  201f90:	ffff           	.short 0xffff
-  201f92:	ffff           	.short 0xffff
-  201f94:	ffff           	.short 0xffff
-  201f96:	ffff           	.short 0xffff
-  201f98:	ffff           	.short 0xffff
-  201f9a:	ffff           	.short 0xffff
-  201f9c:	ffff           	.short 0xffff
-  201f9e:	ffff           	.short 0xffff
-  201fa0:	ffff           	.short 0xffff
-  201fa2:	ffff           	.short 0xffff
-  201fa4:	ffff           	.short 0xffff
-  201fa6:	ffff           	.short 0xffff
-  201fa8:	ffff           	.short 0xffff
-  201faa:	ffff           	.short 0xffff
-  201fac:	ffff           	.short 0xffff
-  201fae:	ffff           	.short 0xffff
-  201fb0:	ffff           	.short 0xffff
-  201fb2:	ffff           	.short 0xffff
-  201fb4:	ffff           	.short 0xffff
-  201fb6:	ffff           	.short 0xffff
-  201fb8:	ffff           	.short 0xffff
-  201fba:	ffff           	.short 0xffff
-  201fbc:	ffff           	.short 0xffff
-  201fbe:	ffff           	.short 0xffff
-  201fc0:	ffff           	.short 0xffff
-  201fc2:	ffff           	.short 0xffff
-  201fc4:	ffff           	.short 0xffff
-  201fc6:	ffff           	.short 0xffff
-  201fc8:	ffff           	.short 0xffff
-  201fca:	ffff           	.short 0xffff
-  201fcc:	ffff           	.short 0xffff
-  201fce:	ffff           	.short 0xffff
-  201fd0:	ffff           	.short 0xffff
-  201fd2:	ffff           	.short 0xffff
-  201fd4:	ffff           	.short 0xffff
-  201fd6:	ffff           	.short 0xffff
-  201fd8:	ffff           	.short 0xffff
-  201fda:	ffff           	.short 0xffff
-  201fdc:	ffff           	.short 0xffff
-  201fde:	ffff           	.short 0xffff
-  201fe0:	ffff           	.short 0xffff
-  201fe2:	ffff           	.short 0xffff
-  201fe4:	ffff           	.short 0xffff
-  201fe6:	ffff           	.short 0xffff
-  201fe8:	ffff           	.short 0xffff
-  201fea:	ffff           	.short 0xffff
-  201fec:	ffff           	.short 0xffff
-  201fee:	ffff           	.short 0xffff
-  201ff0:	ffff           	.short 0xffff
-  201ff2:	ffff           	.short 0xffff
-  201ff4:	ffff           	.short 0xffff
-  201ff6:	ffff           	.short 0xffff
-  201ff8:	ffff           	.short 0xffff
-  201ffa:	ffff           	.short 0xffff
+  ....
+  ....
   201ffc:	ffff           	.short 0xffff
   201ffe:	ffff           	.short 0xffff
+
+; THE END

@@ -17,7 +17,9 @@ also for the CFC (Callan Floppy Controller), which was
 yet another board.
 
 My game is to disassemble and annotate these ROMS.
-What you want to look at is:
+The files you want to look at are:
 
-callan13.dis
-callan24.dis
+
+callan13.txt
+
+callan24.txt
