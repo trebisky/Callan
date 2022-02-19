@@ -20,10 +20,10 @@ callan24.bin:
 	mv merge.out callan24.bin
 
 callan13.elf: callan13.bin
-	./wrap callan13.bin callan13.elf
+	./wrap callan13.bin callan13.elf 200000
 
 callan24.elf: callan24.bin
-	./wrap callan24.bin callan24.elf
+	./wrap callan24.bin callan24.elf 400000
 
 callan13.dis: callan13.elf
 	$(DUMP) callan13.elf >callan13.tmp

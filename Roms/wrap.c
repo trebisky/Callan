@@ -44,7 +44,7 @@ unsigned int rombase = 0x00400000;
 unsigned int entry = 0x00400000;
 #endif
 
-/* These must be hand edited though */
+/* XXX these get overwritten from command line */
 unsigned int rombase = 0x00400000;
 unsigned int entry = 0x00400000;
 
@@ -94,13 +94,19 @@ int main ( int argc, char **argv )
 	int t_index;
 	int st_size;
 
+	argc--;
+	argv++;
+
 	if ( argc != 3 ) {
-	    fprintf ( stderr, "Usage: wrap image-name\n" );
+	    fprintf ( stderr, "Usage: wrap image-name elf-name addr\n" );
 	    exit ( 1 );
 	}
 
-	rom_image = argv[1];
-	elf_image = argv[2];
+	rom_image = argv[0];
+	elf_image = argv[1];
+
+	rombase = strtol ( argv[2], NULL, 16 );
+	entry = rombase;
 
 	printf ( "Reading image: %s\n", rom_image );
 	rom = open ( rom_image, O_RDONLY );
