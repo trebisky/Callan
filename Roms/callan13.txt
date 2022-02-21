@@ -1,24 +1,50 @@
+; Callan CPU board boot tom disassembly
+; Tom Trebisky  2-20-2022
+;
 
-callan13.elf:     file format elf32-m68k
+; Board addresses
+;
+; 0xe00000 - read 16 bit register, write context register
+;
+; The 7201 dual UART only has these 4 8 bit registers.
+; 0x600000 - serial port A data
+; 0x600002 - serial port A status/control
+;
+; 0x600004 - serial port A data
+; 0x600006 - serial port A status/control
 
+; The 9513 timer contains five 16 bit timers
+; It is accessed via only two 8 bit registers!
+;  (actually the data register gets used in 16 bit mode)
+; All 5 timers are fed a 4 Mhz clock
+;
+; 0x800000 - data
+; 0x800002 - status/command
+;
+; Timer 1 is a watchdog connected to the reset circuit
+; Timer 2 is a "user" timer on interrupt 6
+; Timer 3 is on interrupt 7 (non-maskable) and drives RAM refresh
+; Timer 4 is baud rate for serial A
+; Timer 5 is baud rate for serial B
 
-Disassembly of section .text:
+; -------------------------------------------------------
 
-00200000 <.text>:
-  200000:	0000 1000      	orib #0,%d0		; reset SP
-  200004:	0020 00b0      	orib #0x50,%a0@-	; reset PC
+  200000:	0000 1000      	; reset SP
+  200004:	0020 00b0      	; reset PC
 
 ; These are not exception vectors.
-; The exception vectors must get constructed in RAM
-  200008:	3f3c 4949      	movew #0x4949,%sp@-	; II
+; The actual exception vectors must get constructed in RAM
+; These are handlers jumped to from the table we construct.
+
+  200008:	3f3c 4949      	movew #0x4949,%sp@-	; II (illegal instruction)
   20000c:	6054           	bras 0x200062
-  20000e:	3f3c 5a44      	movew #0x5a44,%sp@-	; ZD
+  20000e:	3f3c 5a44      	movew #0x5a44,%sp@-	; ZD (zero divide)
   200012:	604e           	bras 0x200062
-  200014:	3f3c 4368      	movew #0x4368,%sp@-	; Ch
+  200014:	3f3c 4368      	movew #0x4368,%sp@-	; Ch (CHK)
   200018:	6048           	bras 0x200062
-  20001a:	3f3c 5456      	movew #0x5456,%sp@-	; TV
+  20001a:	3f3c 5456      	movew #0x5456,%sp@-	; TV (TrapV)
   20001e:	6042           	bras 0x200062
-  200020:	3f3c 5072      	movew #0x5072,%sp@-	; Pr
+  200020:	3f3c 5072      	movew #0x5072,%sp@-	; Pr (Privelege violation)
   200024:	603c           	bras 0x200062
   200026:	3f3c 5530      	movew #0x5530,%sp@-	; U0
   20002a:	6036           	bras 0x200062
@@ -38,51 +64,69 @@ Disassembly of section .text:
   200054:	600c           	bras 0x200062
   200056:	3f3c 4c36      	movew #0x4c36,%sp@-	; L6
   20005a:	6006           	bras 0x200062
-  20005c:	3f3c 5472      	movew #0x5472,%sp@-	; Tr
+  20005c:	3f3c 5472      	movew #0x5472,%sp@-	; Tr (Trap n)
   200060:	4e71           	nop
   200062:	4ef9 0020 0336 	jmp 0x200336
 
+; no path to here ??
   200068:	4e56 ffe4      	linkw %fp,#-28
   20006c:	48ee 1ce4 ffe4 	moveml %d2/%d5-%d7/%a2-%a4,%fp@(-28)
-  200072:	2f00           	movel %d0,%sp@-
+
+; level 7 autovector comes here.
+; this is in response to timer x and the purpose is to drive
+; the DRAM refresh code.
+
+  200072:	2f00           	movel %d0,%sp@-		; level 7 interrupt
   200074:	33fc ffe3 0080 	movew #0x1d,0x800002
   20007a:	0002
-  20007c:	4eb9 0000 0100 	jsr 0x100
-  200082:	54b9 0000 0274 	addql #2,0x274
+  20007c:	4eb9 0000 0100 	jsr 0x100		; in RAM
+  200082:	54b9 0000 0274 	addql #2,0x274		; only place accessed !?
   200088:	4ef9 0020 1e90 	jmp 0x201e90
 
+; no path to here ??
   20008e:	4880           	extw %d0
   200090:	48c0           	extl %d0
+
+; odd jump to here from 201ea8
   200092:	0280 0000 0080 	andil #0x80,%d0
   200098:	6764           	beqs 0x2000fe
-  20009a:	23fc 0000 0001 	movel #1,0x266
+
+  20009a:	23fc 0000 0001 	movel #1,0x266		; serial_flag
   2000a0:	0000 0266
 
+; odd jump to here from 201e9c (and 200104)
   2000a4:	201f           	movel %sp@+,%d0
-  2000a6:	13fc 0010 0060 	moveb #0x10,0x600002
+  2000a6:	13fc 0010 0060 	moveb #0x10,0x600002	; serial port A ctrl
   2000ac:	0002
   2000ae:	4e73           	rte
 
+; ================================================
 ; execution starts here ...
 
-; we fiddle with the 9513 timer
-  2000b0:	33fc ffff 0080 	movew #-1,0x800002
+; First, we initialize the 9513 timer.
+; the reset places zeros in the hold register,
+; so the subsequent command to load all, loads them all with zeros
+
+  2000b0:	33fc ffff 0080 	movew #0xff,0x800002	; master reset the timer
   2000b6:	0002
-  2000b8:	33fc ff5f 0080 	movew #0xa1,0x800002
+  2000b8:	33fc ff5f 0080 	movew #0x5f,0x800002	; load all counters
   2000be:	0002
 
 ; This is odd.  Here we jump to a code fragment at the
 ; end of the ROM, which jumps back to "c8" below.
 ; like a classic "binary patch" for some reason.
+; It certainly works fine and serves to finish timer initialization
 
   2000c0:	4ef9 0020 1ed6 	jmp 0x201ed6
   2000c6:	4e71           	nop
+
+; === initialize segment map
 
 ; set d5 = 0 and enter loop below
   2000c8:	4285           	clrl %d5
   2000ca:	6054           	bras 0x200120
 
-; start loop
+; start big loop
   2000cc:	2005           	movel %d5,%d0		; d0 = d5
   2000ce:	720c           	moveq #0xc,%d1		; d1 = 0xc
   2000d0:	e3a0           	asll %d1,%d0
@@ -103,20 +147,24 @@ Disassembly of section .text:
   2000fa:	5286           	addql #1,%d6		; d6++
   2000fc:	60dc           	bras 0x2000da
 
-  2000fe:	4ab9 0000 0266 	tstl 0x266
+; --- out of place code slapped in here.
+  2000fe:	4ab9 0000 0266 	tstl 0x266		; serial_flag
   200104:	679e           	beqs 0x2000a4
-  200106:	42b9 0000 0266 	clrl 0x266
-  20010c:	13fc 0010 0060 	moveb #0x10,0x600002
+
+  200106:	42b9 0000 0266 	clrl 0x266		; serial_flag
+  20010c:	13fc 0010 0060 	moveb #0x10,0x600002	; serial port A ctrl
   200112:	0002
   200114:	201f           	movel %sp@+,%d0
   200116:	3f3c 0001      	movew #1,%sp@-
   20011a:	6000 01ea      	braw 0x200306
+; --- end of out of place code
 
+; continue initialization
   20011e:	5285           	addql #1,%d5
   200120:	0c85 0000 0010 	cmpil #0x10,%d5		; limit to 16 passes
-  200126:	6da4           	blts 0x2000cc		; loop
+  200126:	6da4           	blts 0x2000cc		; big loop
 
-; Now set up the page map
+; === initialize page map
 
   200128:	4279 00e0 0000 	clrw 0xe00000		; zero the context register
   20012e:	4286           	clrl %d6		; d6 = 0
@@ -133,13 +181,20 @@ Disassembly of section .text:
   200148:	3080           	movew %d0,%a0@
   20014a:	5286           	addql #1,%d6		; d6++
   20014c:	0c86 0000 0400 	cmpil #0x400,%d6	; limit to 1024 passes
-  200152:	6dde           	blts 0x200132
+  200152:	6dde           	blts 0x200132		; loop
 
+; It would seem that this is a write to the first word of this boot ROM
+; maybe this unmaps the ROM from address 0 where it first must be mapped
+; for RESET to work.  Note that immediately after this, code begins
+; writing to RAM
   200154:	33fc 0001 0020 	movew #1,0x200000	; ?? how can this work
   20015a:	0000
+
   20015c:	23fc 0020 037c 	movel #0x20037c,0x8	; first vector (bus error)
   200162:	0000 0008
+
   200166:	4eb9 0020 10ec 	jsr 0x2010ec
+
   20016c:	720b           	moveq #0xb,%d1
   20016e:	e3a0           	asll %d1,%d0
   200170:	2e00           	movel %d0,%d7
@@ -148,89 +203,154 @@ Disassembly of section .text:
 
   20017a:	28fc ffff ffff 	movel #-1,%a4@+
   200180:	b9c7           	cmpal %d7,%a4
-  200182:	65f6           	bcss 0x20017a
+  200182:	65f6           	bcss 0x20017a		; loop
 
   200184:	267c 0000 0200 	moveal #0x200,%a3
-  20018a:	2747 0078      	movel %d7,%a3@(120)
-  20018e:	42ab 007c      	clrl %a3@(124)
-  200192:	33fc ff04 0080 	movew #0xfc,0x800002
+  20018a:	2747 0078      	movel %d7,%a3@(0x78)
+  20018e:	42ab 007c      	clrl %a3@(0x7c)
+
+; second phase of timer initialization
+; this is setting baud rates for serial ports A and B
+; note that both are set the same.
+
+; dividing the main (4 Mhz) clock by 13 along with the divide by 16
+; selected in UART initialization yields 19230.77,
+; i.e. 19200 baud
+
+  200192:	33fc ff04 0080 	movew #0xff04,0x800002	; select timer 4, mode reg
   200198:	0002
-  20019a:	33fc 0b22 0080 	movew #0xb22,0x800000
+  20019a:	33fc 0b22 0080 	movew #0x0b22,0x800000	; mode D
   2001a0:	0000
-  2001a2:	33fc 000d 0080 	movew #0xd,0x800000
+  2001a2:	33fc 000d 0080 	movew #0x000d,0x800000	; divide by 13
   2001a8:	0000
-  2001aa:	33fc ff05 0080 	movew #0xfb,0x800002
+  2001aa:	33fc ff05 0080 	movew #0xff05,0x800002	; select timer 5, mode reg
   2001b0:	0002
-  2001b2:	33fc 0b22 0080 	movew #0xb22,0x800000
+  2001b2:	33fc 0b22 0080 	movew #0x0b22,0x800000	; mode D
   2001b8:	0000
-  2001ba:	33fc 000d 0080 	movew #0xd,0x800000
+  2001ba:	33fc 000d 0080 	movew #0x000d,0x800000	; divide by 13
   2001c0:	0000
-  2001c2:	33fc ff38 0080 	movew #0xc8,0x800002
+  2001c2:	33fc ff38 0080 	movew #0xff38,0x800002	; arm timers 4 and 5
   2001c8:	0002
+
+; load A2 with pointer to uart initialization table
+; this is exactly the initialization sequence described in the PM68K manual
+;
+;  201e20:	1818 0200 0444 03c1 05ea 0100
+;  201e2c:	.....
+;
+; so what does the above do?
+
+;  1818	-- two resets
+;  0200 -- CR2: no interrupts
+;  0444 -- CR4: clock 16x, 1 stop bit
+;  03c1 -- CR3: enable recvr, 8 bits
+;  05ea -- CR5: enable xmit, 8 bits, DTR, RTS
+;  0100 -- CR1; no interrupts
+
+; loop continues while a2 < 0x201e2c
+
   2001ca:	247c 0020 1e20 	moveal #0x201e20,%a2
   2001d0:	600c           	bras 0x2001de
-  2001d2:	13d2 0060 0002 	moveb %a2@,0x600002
-  2001d8:	13da 0060 0006 	moveb %a2@+,0x600006
+
+  2001d2:	13d2 0060 0002 	moveb %a2@,0x600002	; serial port A ctrl
+  2001d8:	13da 0060 0006 	moveb %a2@+,0x600006	; port B ctrl
   2001de:	b5f9 0020 1e2c 	cmpal 0x201e2c,%a2
   2001e4:	65ec           	bcss 0x2001d2
-  2001e6:	4239 0060 0000 	clrb 0x600000
-  2001ec:	4239 0060 0004 	clrb 0x600004
-  2001f2:	33fc ff03 0080 	movew #0xfd,0x800002
+
+  2001e6:	4239 0060 0000 	clrb 0x600000		; port A data
+  2001ec:	4239 0060 0004 	clrb 0x600004		; port B data
+
+; set up timer 3, this drives the NMI (irq7) for DRAM refresh
+
+  2001f2:	33fc ff03 0080 	movew #0xff03,0x800002	; select timer 3, mode reg
   2001f8:	0002
-  2001fa:	33fc 0b22 0080 	movew #0xb22,0x800000
+  2001fa:	33fc 0b22 0080 	movew #0x0b22,0x800000
   200200:	0000
   200202:	33fc 1f40 0080 	movew #0x1f40,0x800000
   200208:	0000
-  20020a:	33fc ff24 0080 	movew #0xdc,0x800002
+  20020a:	33fc ff24 0080 	movew #0xff24,0x800002	; arm timer 3
   200210:	0002
+
+; make vector table from 4 to 0xbc call "32" (Un)
   200212:	287c 0000 00bc 	moveal #0xbc,%a4
   200218:	28bc 0020 0032 	movel #0x200032,%a4@
   20021e:	598c           	subql #4,%a4
   200220:	b9fc 0000 0000 	cmpal #0,%a4
   200226:	66f0           	bnes 0x200218
+
+; set up vector table
   200228:	287c 0000 0008 	moveal #8,%a4
-  20022e:	28fc 0020 0344 	movel #0x200344,%a4@+
-  200234:	28fc 0020 0360 	movel #0x200360,%a4@+
-  20023a:	28fc 0020 0008 	movel #0x200008,%a4@+
-  200240:	28fc 0020 000e 	movel #0x20000e,%a4@+
-  200246:	28fc 0020 0014 	movel #0x200014,%a4@+
-  20024c:	28fc 0020 001a 	movel #0x20001a,%a4@+
-  200252:	28fc 0020 0020 	movel #0x200020,%a4@+
-  200258:	28fc 0020 0338 	movel #0x200338,%a4@+
-  20025e:	28fc 0020 0026 	movel #0x200026,%a4@+
-  200264:	28fc 0020 002c 	movel #0x20002c,%a4@+
+  20022e:	28fc 0020 0344 	movel #0x200344,%a4@+	; bus error
+  200234:	28fc 0020 0360 	movel #0x200360,%a4@+	; address error
+  20023a:	28fc 0020 0008 	movel #0x200008,%a4@+	; illegal instr
+  200240:	28fc 0020 000e 	movel #0x20000e,%a4@+	; zero divide
+  200246:	28fc 0020 0014 	movel #0x200014,%a4@+	; CHK
+  20024c:	28fc 0020 001a 	movel #0x20001a,%a4@+	; TRAPV
+  200252:	28fc 0020 0020 	movel #0x200020,%a4@+	; Privelege violation
+  200258:	28fc 0020 0338 	movel #0x200338,%a4@+	; trace
+  20025e:	28fc 0020 0026 	movel #0x200026,%a4@+	; line 1010
+  200264:	28fc 0020 002c 	movel #0x20002c,%a4@+	; line 1011
+
   20026a:	287c 0000 0064 	moveal #0x64,%a4
-  200270:	28fc 0020 0038 	movel #0x200038,%a4@+
-  200276:	28fc 0020 003e 	movel #0x20003e,%a4@+
-  20027c:	28fc 0020 0044 	movel #0x200044,%a4@+
-  200282:	28fc 0020 004a 	movel #0x20004a,%a4@+
-  200288:	28fc 0020 0050 	movel #0x200050,%a4@+
-  20028e:	28fc 0020 0056 	movel #0x200056,%a4@+
-  200294:	28fc 0020 0072 	movel #0x200072,%a4@+
+  200270:	28fc 0020 0038 	movel #0x200038,%a4@+	; level 1
+  200276:	28fc 0020 003e 	movel #0x20003e,%a4@+	; level 2
+  20027c:	28fc 0020 0044 	movel #0x200044,%a4@+	; level 3
+  200282:	28fc 0020 004a 	movel #0x20004a,%a4@+	; level 4
+  200288:	28fc 0020 0050 	movel #0x200050,%a4@+	; level 5
+  20028e:	28fc 0020 0056 	movel #0x200056,%a4@+	; level 6
+  200294:	28fc 0020 0072 	movel #0x200072,%a4@+	; level 7 (refresh)
+
   20029a:	6006           	bras 0x2002a2
-  20029c:	28fc 0020 005c 	movel #0x20005c,%a4@+
+  20029c:	28fc 0020 005c 	movel #0x20005c,%a4@+	; TRAP n vectors
   2002a2:	b9fc 0000 00bc 	cmpal #0xbc,%a4
   2002a8:	63f2           	blss 0x20029c
-  2002aa:	23fc 0020 032a 	movel #0x20032a,0x84
+
+  2002aa:	23fc 0020 032a 	movel #0x20032a,0x84	; TRAP 1
   2002b0:	0000 0084
-  2002b4:	23fc 0020 0330 	movel #0x200330,0xb8
+  2002b4:	23fc 0020 0330 	movel #0x200330,0xb8	; TRAP x
   2002ba:	0000 00b8
-  2002be:	23fc 0020 033e 	movel #0x20033e,0xbc
+  2002be:	23fc 0020 033e 	movel #0x20033e,0xbc	; TRAP x+1
   2002c4:	0000 00bc
+
+; 0x4e71 is a NOP
+; 0x4e75 is a RTS
+;
+; This places a bunch of NOP instructions at RAM address 0x100
+; which will be called by the level 7 interrupt routine to perform
+; RAM refresh
+
   2002c8:	287c 0000 0100 	moveal #0x100,%a4
   2002ce:	6006           	bras 0x2002d6
-  2002d0:	28fc 4e71 4e71 	movel #0x4e714e71,%a4@+
+  2002d0:	28fc 4e71 4e71 	movel #0x4e714e71,%a4@+	; user interrupts
   2002d6:	b9fc 0000 01fc 	cmpal #0x1fc,%a4
   2002dc:	65f2           	bcss 0x2002d0
+
+; end the whole thing with a final NOP and an RTS
   2002de:	28bc 4e71 4e75 	movel #0x4e714e75,%a4@
-  2002e4:	23fc 0000 0200 	movel #0x200,0x0
+
+  2002e4:	23fc 0000 0200 	movel #0x200,0x0	; SP for unexpected reset
   2002ea:	0000 0000
-  2002ee:	42ab 0066      	clrl %a3@(102)
-  2002f2:	4eb9 0020 1eae 	jsr 0x201eae		; go check for extension ROM
+
+; a3 is still set to 0x200
+; which seems to be the base of some block of stuff
+  2002ee:	42ab 0066      	clrl %a3@(0x66)
+
+; ==============================================
+; The following call runs the extension ROM if there is one.
+
+  2002f2:	4eb9 0020 1eae 	jsr 0x201eae		; go run the extension ROM
   2002f8:	4e71           	nop
+
+; fall through here if the extension ROM returns
+; this seems unlikely, given that it would fall into
+; exception handling code
+
+; Jumped to from below
   2002fa:	2f3c 0000 0000 	movel #0,%sp@-
   200300:	40e7           	movew %sr,%sp@-
   200302:	3f3c 0000      	movew #0,%sp@-
+
+; common code for exception handlers below
   200306:	598f           	subql #4,%sp
   200308:	48e7 ffff      	moveml %d0-%sp,%sp@-
   20030c:	4e68           	movel %usp,%a0
@@ -242,15 +362,24 @@ Disassembly of section .text:
   200322:	4cdf ffff      	moveml %sp@+,%d0-%sp
   200326:	5c8f           	addql #6,%sp
   200328:	4e73           	rte
+
   20032a:	3f3c 0002      	movew #2,%sp@-
   20032e:	60d6           	bras 0x200306
+
   200330:	3f3c 0003      	movew #3,%sp@-
   200334:	60d0           	bras 0x200306
+
+; all the handlers up top branch to here
   200336:	60ce           	bras 0x200306
+
+; trace instruction handler
   200338:	3f3c 0004      	movew #4,%sp@-
   20033c:	60c8           	bras 0x200306
+
   20033e:	3f3c 0005      	movew #5,%sp@-
   200342:	60c2           	bras 0x200306
+
+; bus error handler
   200344:	23c8 0000 0004 	movel %a0,0x4
   20034a:	2079 0000 0000 	moveal 0x0,%a0
   200350:	20df           	movel %sp@+,%a0@+
@@ -258,6 +387,8 @@ Disassembly of section .text:
   200354:	2079 0000 0004 	moveal 0x4,%a0
   20035a:	3f3c 0006      	movew #6,%sp@-
   20035e:	60a6           	bras 0x200306
+
+; address error handler
   200360:	23c8 0000 0004 	movel %a0,0x4
   200366:	2079 0000 0000 	moveal 0x0,%a0
   20036c:	20df           	movel %sp@+,%a0@+
@@ -266,16 +397,21 @@ Disassembly of section .text:
   200376:	3f3c 0007      	movew #7,%sp@-
   20037a:	608a           	bras 0x200306
 
-; bus error exception comes here.
-; doesn't do much
+; This is set up early as a bus error handler, but is abandoned
+; soon thereafter by a mapping to the above.
+; It doesn't do much, it must just make the system immune
+; to bus errors during early initialization.
   20037c:	508f           	addql #8,%sp
   20037e:	4e73           	rte
 
+; no reference
   200380:	4cee 1ce4 ffe4 	moveml %fp@(-28),%d2/%d5-%d7/%a2-%a4
   200386:	4e5e           	unlk %fp
   200388:	4e75           	rts
-  20038a:	0000 4e56      	orib #0x56,%d0
-  20038e:	fff4           	.short 0xfff4
+
+  20038a:	0000
+
+  20038c:	4e56 fff4      	linkw %fp,#-12
   200390:	48ee 20c0 fff4 	moveml %d6-%d7/%a5,%fp@(-12)
   200396:	2a7c 0000 0208 	moveal #0x208,%a5
   20039c:	4287           	clrl %d7
@@ -321,6 +457,7 @@ Disassembly of section .text:
   200410:	4cee 20c0 fff4 	moveml %fp@(-12),%d6-%d7/%a5
   200416:	4e5e           	unlk %fp
   200418:	4e75           	rts
+
   20041a:	4e56 0000      	linkw %fp,#0
   20041e:	48ee 0000 0000 	moveml #0,%fp@()
   200424:	2079 0000 025a 	moveal 0x25a,%a0
@@ -342,9 +479,15 @@ Disassembly of section .text:
   20045c:	1010           	moveb %a0@,%d0
   20045e:	4e5e           	unlk %fp
   200460:	4e75           	rts
+
+; must be something like "puts"
+; address of string is on stack.
+
   200462:	4e56 fffc      	linkw %fp,#-4
   200466:	48ee 2000 fffc 	moveml %a5,%fp@(-4)
   20046c:	2a6e 0008      	moveal %fp@(8),%a5
+
+  ; loop
   200470:	4a15           	tstb %a5@
   200472:	6712           	beqs 0x200486
   200474:	101d           	moveb %a5@+,%d0
@@ -354,9 +497,11 @@ Disassembly of section .text:
   20047c:	4eb9 0020 0e78 	jsr 0x200e78
   200482:	588f           	addql #4,%sp
   200484:	60ea           	bras 0x200470
+
   200486:	4cee 2000 fffc 	moveml %fp@(-4),%a5
   20048c:	4e5e           	unlk %fp
   20048e:	4e75           	rts
+
   200490:	4e56 fff4      	linkw %fp,#-12
   200494:	48ee 00e0 fff4 	moveml %d5-%d7,%fp@(-12)
   20049a:	2e2e 0008      	movel %fp@(8),%d7
@@ -767,6 +912,8 @@ Disassembly of section .text:
   2009ea:	4cee 20c0 fff4 	moveml %fp@(-12),%d6-%d7/%a5
   2009f0:	4e5e           	unlk %fp
   2009f2:	4e75           	rts
+
+; Almost all exception handlers call this
   2009f4:	4e56 ffec      	linkw %fp,#-20
   2009f8:	48ee 20c0 ffec 	moveml %d6-%d7/%a5,%fp@(-20)
   2009fe:	2a7c 0000 0200 	moveal #0x200,%a5
@@ -787,9 +934,15 @@ Disassembly of section .text:
   200a36:	207c 0020 1cd8 	moveal #0x201cd8,%a0
   200a3c:	2070 0000      	moveal %a0@(,%d0:w),%a0
   200a40:	4ed0           	jmp %a0@
+
+; If we ever did run this, we would print the monitor greeting.
+;
+; 0x201e40 is the line "PM68k Monitor, Version 1.2 - "
+
   200a42:	2f3c 0020 1e40 	movel #0x201e40,%sp@-
   200a48:	6100 fa18      	bsrw 0x200462
   200a4c:	588f           	addql #4,%sp
+
   200a4e:	2f3c 0000 0005 	movel #5,%sp@-
   200a54:	2f2d 0078      	movel %a5@(120),%sp@-
   200a58:	6100 fa36      	bsrw 0x200490
@@ -800,6 +953,7 @@ Disassembly of section .text:
   200a6a:	2d6d 0078 0048 	movel %a5@(120),%fp@(72)
   200a70:	1b7c 001e 0080 	moveb #0x1e,%a5@(128)
   200a76:	6000 00f6      	braw 0x200b6e
+
   200a7a:	2f3c 0020 1d9b 	movel #0x201d9b,%sp@-
   200a80:	6100 f9e0      	bsrw 0x200462
   200a84:	588f           	addql #4,%sp
@@ -950,8 +1104,11 @@ Disassembly of section .text:
   200ca0:	6100 fce0      	bsrw 0x200982
   200ca4:	588f           	addql #4,%sp
   200ca6:	6000 fece      	braw 0x200b76
+
+; no reference
   200caa:	2e7c 0000 1000 	moveal #0x1000,%sp
   200cb0:	4ef9 0020 02fa 	jmp 0x2002fa
+
   200cb6:	6100 fb9c      	bsrw 0x200854
   200cba:	6000 feba      	braw 0x200b76
   200cbe:	6100 f8fa      	bsrw 0x2005ba
@@ -1047,10 +1204,12 @@ Disassembly of section .text:
   200e0a:	4cee 20c0 ffec 	moveml %fp@(-20),%d6-%d7/%a5
   200e10:	4e5e           	unlk %fp
   200e12:	4e75           	rts
+
+; putc_A
   200e14:	4e56 fffc      	linkw %fp,#-4
   200e18:	48ee 0080 fffc 	moveml %d7,%fp@(-4)
   200e1e:	1e2e 000b      	moveb %fp@(11),%d7
-  200e22:	1039 0060 0002 	moveb 0x600002,%d0
+  200e22:	1039 0060 0002 	moveb 0x600002,%d0	; port A status
   200e28:	4880           	extw %d0
   200e2a:	48c0           	extl %d0
   200e2c:	0280 0000 0004 	andil #4,%d0
@@ -1060,10 +1219,12 @@ Disassembly of section .text:
   200e3c:	4cee 0080 fffc 	moveml %fp@(-4),%d7
   200e42:	4e5e           	unlk %fp
   200e44:	4e75           	rts
+
+; putc_B
   200e46:	4e56 fffc      	linkw %fp,#-4
   200e4a:	48ee 0080 fffc 	moveml %d7,%fp@(-4)
   200e50:	1e2e 000b      	moveb %fp@(11),%d7
-  200e54:	1039 0060 0006 	moveb 0x600006,%d0
+  200e54:	1039 0060 0006 	moveb 0x600006,%d0	; port B status
   200e5a:	4880           	extw %d0
   200e5c:	48c0           	extl %d0
   200e5e:	0280 0000 0004 	andil #4,%d0
@@ -1073,6 +1234,9 @@ Disassembly of section .text:
   200e6e:	4cee 0080 fffc 	moveml %fp@(-4),%d7
   200e74:	4e5e           	unlk %fp
   200e76:	4e75           	rts
+
+; must be something like "putc"
+
   200e78:	4e56 fff8      	linkw %fp,#-8
   200e7c:	48ee 2080 fff8 	moveml %d7/%a5,%fp@(-8)
   200e82:	1e2e 000b      	moveb %fp@(11),%d7
@@ -1100,10 +1264,11 @@ Disassembly of section .text:
   200ec8:	4cee 2080 fff8 	moveml %fp@(-8),%d7/%a5
   200ece:	4e5e           	unlk %fp
   200ed0:	4e75           	rts
+
   200ed2:	4e56 fff8      	linkw %fp,#-8
   200ed6:	48ee 2080 fff8 	moveml %d7/%a5,%fp@(-8)
   200edc:	2039 0000 0282 	movel 0x282,%d0
-  200ee2:	0680 0060 0002 	addil #0x600002,%d0
+  200ee2:	0680 0060 0002 	addil #0x600002,%d0	; port A status
   200ee8:	2a40           	moveal %d0,%a5
   200eea:	1015           	moveb %a5@,%d0
   200eec:	4880           	extw %d0
@@ -1131,7 +1296,7 @@ Disassembly of section .text:
   200f2a:	4e56 fff8      	linkw %fp,#-8
   200f2e:	48ee 00c0 fff8 	moveml %d6-%d7,%fp@(-8)
   200f34:	4286           	clrl %d6
-  200f36:	1039 0060 0006 	moveb 0x600006,%d0
+  200f36:	1039 0060 0006 	moveb 0x600006,%d0	; port B status
   200f3c:	4880           	extw %d0
   200f3e:	48c0           	extl %d0
   200f40:	0280 0000 0001 	andil #1,%d0
@@ -1142,7 +1307,7 @@ Disassembly of section .text:
   200f52:	2f00           	movel %d0,%sp@-
   200f54:	6100 febe      	bsrw 0x200e14
   200f58:	588f           	addql #4,%sp
-  200f5a:	1039 0060 0002 	moveb 0x600002,%d0
+  200f5a:	1039 0060 0002 	moveb 0x600002,%d0	; port A status
   200f60:	4880           	extw %d0
   200f62:	48c0           	extl %d0
   200f64:	0280 0000 0001 	andil #1,%d0
@@ -1227,7 +1392,7 @@ Disassembly of section .text:
   201066:	2005           	movel %d5,%d0
   201068:	720c           	moveq #0xc,%d1
   20106a:	e3a0           	asll %d1,%d0
-  20106c:	33c0 00e0 0000 	movew %d0,0xe00000
+  20106c:	33c0 00e0 0000 	movew %d0,0xe00000	; context register
   201072:	2004           	movel %d4,%d0
   201074:	720f           	moveq #0xf,%d1
   201076:	e3a0           	asll %d1,%d0
@@ -1237,13 +1402,13 @@ Disassembly of section .text:
   201082:	2006           	movel %d6,%d0
   201084:	720c           	moveq #0xc,%d1
   201086:	e3a0           	asll %d1,%d0
-  201088:	33c0 00e0 0000 	movew %d0,0xe00000
+  201088:	33c0 00e0 0000 	movew %d0,0xe00000	; context register
   20108e:	60cc           	bras 0x20105c
   201090:	2c2b 007c      	movel %a3@(124),%d6
   201094:	2005           	movel %d5,%d0
   201096:	720c           	moveq #0xc,%d1
   201098:	e3a0           	asll %d1,%d0
-  20109a:	33c0 00e0 0000 	movew %d0,0xe00000
+  20109a:	33c0 00e0 0000 	movew %d0,0xe00000	; context register
   2010a0:	2004           	movel %d4,%d0
   2010a2:	720f           	moveq #0xf,%d1
   2010a4:	e3a0           	asll %d1,%d0
@@ -1255,7 +1420,7 @@ Disassembly of section .text:
   2010b4:	2006           	movel %d6,%d0
   2010b6:	720c           	moveq #0xc,%d1
   2010b8:	e3a0           	asll %d1,%d0
-  2010ba:	33c0 00e0 0000 	movew %d0,0xe00000
+  2010ba:	33c0 00e0 0000 	movew %d0,0xe00000	; context register
   2010c0:	2003           	movel %d3,%d0
   2010c2:	601e           	bras 0x2010e2
   2010c4:	202b 007c      	movel %a3@(124),%d0
@@ -2158,18 +2323,18 @@ Disassembly of section .text:
   201ca4:	4432 0044
   201ca8:	3300
   201caa:	4434 0044
-  201cae:	3500           	movew %d0,%a2@-
+  201cae:	3500
   201cb0:	4436 0044
-  201cb4:	3700           	movew %d0,%a3@-
+  201cb4:	3700
   201cb6:	4130 0041
-  201cba:	3100           	movew %d0,%a0@-
+  201cba:	3100
   201cbc:	4132 0041
-  201cc0:	3300           	movew %d0,%a1@-
+  201cc0:	3300
   201cc2:	4134 0041
-  201cc6:	3500           	movew %d0,%a2@-
-  201cc8:	4136 0053
-  201ccc:	5300           	subqb #1,%d0
-  201cce:	5553           	subqw #2,%a3@
+  201cc6:	3500
+  201cc8:	4136 0053	"SS"
+  201ccc:	5300
+  201cce:	5553		"US"
   201cd0:	0053 5200      	"SR"
   201cd4:	5043           	"PC"
   201cd6:	0000
@@ -2271,6 +2436,8 @@ Disassembly of section .text:
   201dee:	5768 6174      	subqw #3,%a0@(24948)
   201df2:	3f0a           	movew %a2,%sp@-
   201df4:	0000 0000      	orib #0,%d0
+
+; this looks like data
   201df8:	0020 10ca      	orib #0x36,%a0@-
   201dfc:	0020 10c4      	orib #0x3c,%a0@-
   201e00:	0020 1090      	orib #0x70,%a0@-
@@ -2281,6 +2448,8 @@ Disassembly of section .text:
   201e14:	0020 104e      	orib #0x4e,%a0@-
   201e18:	0020 10d2      	orib #0x2e,%a0@-
   201e1c:	0020 1058      	orib #0x58,%a0@-
+
+; uart initialization table
   201e20:	1818           	moveb %a0@+,%d4
   201e22:	0200 0444      	andib #0x44,%d0
   201e26:	03c1           	bset %d1,%d1
@@ -2314,6 +2483,7 @@ Disassembly of section .text:
   201e78:	6f75           	bles 0x201eef
   201e7a:	740a           	moveq #0xa,%d2
   201e7c:	0000 0000      	orib #0,%d0
+
   201e80:	ffff           	.short 0xffff
   201e82:	ffff           	.short 0xffff
   201e84:	ffff           	.short 0xffff
@@ -2329,15 +2499,15 @@ Disassembly of section .text:
   201e9a:	6606           	bnes 0x201ea2
   201e9c:	4ef9 0020 00a4 	jmp 0x2000a4
 
-  201ea2:	1039 0060 0002 	moveb 0x600002,%d0
+  201ea2:	1039 0060 0002 	moveb 0x600002,%d0	; port A status
   201ea8:	4ef9 0020 0092 	jmp 0x200092
 
+; =========================================================
 ; The following code checks if we have an extension ROM pair
 ; and if so, makes a call to it.
 ; Our extension ROM has exactly what is expected, as follows:
 ;
 ;   400000:       2e7c 0001 fffe  moveal #0x1fffe,%sp
-
 
   201eae:	42ab 0070      	clrl %a3@(112)
   201eb2:	42ab 006c      	clrl %a3@(108)
@@ -2352,58 +2522,62 @@ Disassembly of section .text:
   201ed2:	67f6           	beqs 0x201eca
   201ed4:	4e75           	rts
 
+; An odd bit of orphaned code here that gets run
+; at the very start of initialization
+; This finishes timer initialization in exactly
+; the way documented in the manual.
 
-  201ed6:	33fc ff01 0080 	movew #0xff,0x800002
+  201ed6:	33fc ff01 0080 	movew #0x01,0x800002	; select timer 1
   201edc:	0002
-  201ede:	33fc ffef 0080 	movew #0x11,0x800002
+  201ede:	33fc ffef 0080 	movew #0xef,0x800002	; select 16 bit bus
   201ee4:	0002
-  201ee6:	33fc ffdf 0080 	movew #0x21,0x800002
+  201ee6:	33fc ffdf 0080 	movew #0xdf,0x800002	; disarm all counters
   201eec:	0002
-  201eee:	33fc ff17 0080 	movew #0xe9,0x800002
+  201eee:	33fc ff17 0080 	movew #0x17,0x800002	; select master mode register
   201ef4:	0002
   201ef6:	4ef9 0020 00c8 	jmp 0x2000c8
 
 ; a plain "odx" dump to help with this section
-00001c80 2007 4cee 2080 fff4 4e5e 4e75 3031 3233     L     N^Nu0123
-00001c90 3435 3637 3839 4142 4344 4546 0000 4430   456789ABCDEF  D0
-00001ca0 0044 3100 4432 0044 3300 4434 0044 3500    D1 D2 D3 D4 D5 
-00001cb0 4436 0044 3700 4130 0041 3100 4132 0041   D6 D7 A0 A1 A2 A
-00001cc0 3300 4134 0041 3500 4136 0053 5300 5553   3 A4 A5 A6 SS US
-00001cd0 0053 5200 5043 0000 0020 0a42 0020 0a7a    SR PC     B   z
-00001ce0 0020 0a8a 0020 0b6e 0020 0a9c 0020 0acc          n        
-00001cf0 0020 0aec 0020 0af4 0020 0bd4 0020 0be6                   
-00001d00 0020 0bec 0020 0c10 0020 0c1c 0020 0c4e                  N
-00001d10 0020 0c6c 0020 0c86 0020 0c90 0020 0df8      l            
-00001d20 0020 0caa 0020 0cb6 0020 0cbe 0020 0d14                   
-00001d30 0020 0d3c 0020 0d6e 0020 0df8 0020 0dc4      <   n        
-00001d40 0020 0dd2 0020 0df8 0020 0df8 0020 0df8                   
-00001d50 0020 0df8 0020 0dec 0820 0800 3f20 003a               ?  :
-00001d60 2000 3a20 003a 2000 4272 6561 6b3a 2000     :  :  Break:  
-00001d70 0a42 7265 616b 2061 7420 0055 6e6b 6e6f    Break at  Unkno
-00001d80 776e 206d 6f64 650a 0020 6279 7465 7320   wn mode   bytes 
-00001d90 6f66 206d 656d 6f72 790a 000a 4162 6f72   of memory   Abor
-00001da0 7400 0a54 7261 6365 2074 7261 7000 4275   t  Trace trap Bu
-00001db0 7300 4164 6472 6573 7300 2045 7272 6f72   s Address  Error
-00001dc0 2c20 6164 6472 3a20 0020 6174 2000 0a45   , addr:   at   E
-00001dd0 7863 6570 7469 6f6e 3a20 003e 0053 6567   xception:  > Seg
-00001de0 4d61 7020 0050 6167 654d 6170 2000 5768   Map  PageMap  Wh
-00001df0 6174 3f0a 0000 0000 0020 10ca 0020 10c4   at?             
-00001e00 0020 1090 0020 1062 0020 10d8 0020 103a          b       :
-00001e10 0020 1048 0020 104e 0020 10d2 0020 1058      H   N       X
-00001e20 1818 0200 0444 03c1 05ea 0100 0020 1e2c        D         ,
-00001e30 000d 001a 0068 01a0 0034 00d0 046b 000d        h   4   k  
-00001e40 504d 3638 6b20 4d6f 6e69 746f 722c 2056   PM68k Monitor, V
-00001e50 6572 7369 6f6e 2031 2e32 202d 2000 0000   ersion 1.2 -    
-00001e60 202d 2030 7800 0000 6d6f 6e68 656c 7032    - 0x   monhelp2
-00001e70 0000 0000 5469 6d65 6f75 740a 0000 0000       Timeout     
-00001e80 ffff ffff ffff ffff ffff ffff ffff ffff                   
-00001e90 0cb9 2e7c 0001 0040 0000 6606 4ef9 0020     .|   @  f N   
-00001ea0 00a4 1039 0060 0002 4ef9 0020 0092 42ab      9 `  N     B 
-00001eb0 0070 42ab 006c 0cb9 2e7c 0001 0040 0000    pB  l  .|   @  
-00001ec0 6606 4eb9 0040 0000 4e75 4eb9 0020 0ed2   f N  @  NuN     
-00001ed0 4a00 67f6 4e75 33fc ff01 0080 0002 33fc   J g Nu3       3 
-00001ee0 ffef 0080 0002 33fc ffdf 0080 0002 33fc         3       3 
-00001ef0 ff17 0080 0002 4ef9 0020 00c8 ffff ffff         N         
+00201c80 2007 4cee 2080 fff4 4e5e 4e75 3031 3233     L     N^Nu0123
+00201c90 3435 3637 3839 4142 4344 4546 0000 4430   456789ABCDEF  D0
+00201ca0 0044 3100 4432 0044 3300 4434 0044 3500    D1 D2 D3 D4 D5 
+00201cb0 4436 0044 3700 4130 0041 3100 4132 0041   D6 D7 A0 A1 A2 A
+00201cc0 3300 4134 0041 3500 4136 0053 5300 5553   3 A4 A5 A6 SS US
+00201cd0 0053 5200 5043 0000 0020 0a42 0020 0a7a    SR PC     B   z
+00201ce0 0020 0a8a 0020 0b6e 0020 0a9c 0020 0acc          n        
+00201cf0 0020 0aec 0020 0af4 0020 0bd4 0020 0be6                   
+00201d00 0020 0bec 0020 0c10 0020 0c1c 0020 0c4e                  N
+00201d10 0020 0c6c 0020 0c86 0020 0c90 0020 0df8      l            
+00201d20 0020 0caa 0020 0cb6 0020 0cbe 0020 0d14                   
+00201d30 0020 0d3c 0020 0d6e 0020 0df8 0020 0dc4      <   n        
+00201d40 0020 0dd2 0020 0df8 0020 0df8 0020 0df8                   
+00201d50 0020 0df8 0020 0dec 0820 0800 3f20 003a               ?  :
+00201d60 2000 3a20 003a 2000 4272 6561 6b3a 2000     :  :  Break:  
+00201d70 0a42 7265 616b 2061 7420 0055 6e6b 6e6f    Break at  Unkno
+00201d80 776e 206d 6f64 650a 0020 6279 7465 7320   wn mode   bytes 
+00201d90 6f66 206d 656d 6f72 790a 000a 4162 6f72   of memory   Abor
+00201da0 7400 0a54 7261 6365 2074 7261 7000 4275   t  Trace trap Bu
+00201db0 7300 4164 6472 6573 7300 2045 7272 6f72   s Address  Error
+00201dc0 2c20 6164 6472 3a20 0020 6174 2000 0a45   , addr:   at   E
+00201dd0 7863 6570 7469 6f6e 3a20 003e 0053 6567   xception:  > Seg
+00201de0 4d61 7020 0050 6167 654d 6170 2000 5768   Map  PageMap  Wh
+00201df0 6174 3f0a 0000 0000 0020 10ca 0020 10c4   at?             
+00201e00 0020 1090 0020 1062 0020 10d8 0020 103a          b       :
+00201e10 0020 1048 0020 104e 0020 10d2 0020 1058      H   N       X
+00201e20 1818 0200 0444 03c1 05ea 0100 0020 1e2c        D         ,
+00201e30 000d 001a 0068 01a0 0034 00d0 046b 000d        h   4   k  
+00201e40 504d 3638 6b20 4d6f 6e69 746f 722c 2056   PM68k Monitor, V
+00201e50 6572 7369 6f6e 2031 2e32 202d 2000 0000   ersion 1.2 -    
+00201e60 202d 2030 7800 0000 6d6f 6e68 656c 7032    - 0x   monhelp2
+00201e70 0000 0000 5469 6d65 6f75 740a 0000 0000       Timeout     
+00201e80 ffff ffff ffff ffff ffff ffff ffff ffff                   
+00201e90 0cb9 2e7c 0001 0040 0000 6606 4ef9 0020     .|   @  f N   
+00201ea0 00a4 1039 0060 0002 4ef9 0020 0092 42ab      9 `  N     B 
+00201eb0 0070 42ab 006c 0cb9 2e7c 0001 0040 0000    pB  l  .|   @  
+00201ec0 6606 4eb9 0040 0000 4e75 4eb9 0020 0ed2   f N  @  NuN     
+00201ed0 4a00 67f6 4e75 33fc ff01 0080 0002 33fc   J g Nu3       3 
+00201ee0 ffef 0080 0002 33fc ffdf 0080 0002 33fc         3       3 
+00201ef0 ff17 0080 0002 4ef9 0020 00c8 ffff ffff         N         
 
 ; the rest of the ROM is unused.
   201efc:	ffff           	.short 0xffff
