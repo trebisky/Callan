@@ -24,11 +24,17 @@ def process ( thing ) :
 
     h = tt[0]
     ival = int(tt[0])
-    if ival < -9 or ival > 9 :
+
+#    if ival < -9 or ival > 9 :
+#        h = hex(ival)
+#        # strip silly leading "-"
+#        if h[0] == '-' :
+#            h = h[1:]
+    if ival > 9 :
         h = hex(ival)
-        # strip silly leading "-"
-        if h[0] == '-' :
-            h = h[1:]
+
+    if ival < -9 :
+        h = hex ( ival & 0xffff )
 
     #print ( tt[0] )
     #print ( h )
@@ -49,6 +55,10 @@ def scan ( line ) :
     # in that case.  And they are at the end of the
     # line as in:  linkw %fp,#-4
     if "linkw" in line :
+        return debug ( line )
+
+    # We leave these alone also
+    if "moveq" in line :
         return debug ( line )
 
     # this is typically trap #7 or some such

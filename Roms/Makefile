@@ -2,7 +2,7 @@
 
 DUMP = m68k-linux-gnu-objdump -m68000 -d
 
-all:	merge_rom wrap callan13.dis callan24.dis
+all:	merge_rom wrap callan13.dis callan24.dis callan24r.dis
 
 merge_rom: merge_rom.c
 	cc -o merge_rom merge_rom.c
@@ -34,6 +34,18 @@ callan24.dis: callan24.elf
 	$(DUMP) callan24.elf >callan24.tmp
 	./hexfix callan24.tmp >callan24.dis
 	rm callan24.tmp
+
+# The extension ROM gets relocated to 0x20000 in RAM
+# so it is helpful to do a disassembly at this address
+# also.  I merge this by hand.
+
+callan24r.elf: callan24.bin
+	./wrap callan24.bin callan24r.elf 20000
+
+callan24r.dis: callan24r.elf
+	$(DUMP) callan24r.elf >callan24r.tmp
+	./hexfix callan24r.tmp >callan24r.dis
+	rm callan24r.tmp
 
 clean:
 	rm -f merge_rom merge.out
