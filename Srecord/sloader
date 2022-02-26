@@ -1,0 +1,255 @@
+#!/bin/python3
+
+# First do: dnf install python3-pyserial
+
+# This was originally written for EBAZ4205 reverse engineering.
+# It was copied from: /u1/Projects/EBAZ4205/Grab/grab
+# It was modified later for the Rockchip RK3399
+# It was copied from: /u1/Projects/Rockchip/Ram/grab2
+
+# Now being used with the Callan 2-25-2022
+
+import os
+import serial
+
+device = "/dev/ttyUSB1"
+baud = 9600
+
+# ========================================================
+# ========================================================
+
+# Now and then we get this:
+#  UnicodeDecodeError: 'ascii' codec can't decode byte 0xff
+#   in position 0: ordinal not in range(128)
+#  So .. don't try to decode it
+def flush () :
+    n = 0
+    while True :
+        n += 1
+        #c = ser.read().decode('ascii')
+        c = ser.read()
+        if len(c) == 0 :
+            break
+    return n
+
+def flush_to ( term ) :
+    while True :
+        c = ser.read().decode('ascii')
+        if c == term :
+            break
+        if len(c) == 0 :
+            break
+
+def read_to ( term ) :
+    rv = ""
+    while True :
+        c = ser.read().decode('ascii')
+        if len(c) == 0 :
+            break
+        rv += c
+        if c == term :
+            break
+    return rv
+
+def read_until ( sterm ) :
+    rv = ""
+    slen = len(sterm)
+    while True :
+        c = ser.read().decode('ascii')
+        if len(c) == 0 :
+            break
+        rv += c
+        if len(rv) < slen :
+            continue
+        if rv.endswith ( sterm ) :
+            break
+    return rv
+
+# same as read_until, but discard result
+def flush_until ( sterm ) :
+    read_until ( sterm )
+
+def probe () :
+    cmd = "\r"
+    ser.write ( cmd.encode('ascii') )
+
+    while True :
+        c = ser.read().decode('ascii')
+        if c == '>' :
+            return True
+        if len(c) == 0 :
+            return False
+
+def sync () :
+    n = flush ();
+    print ( n, " chars flushed" )
+
+    for _ in range(10):
+        x = probe ()
+        if x == True :
+            return
+        print ( "Probe failed, try again" )
+
+    print ( "Failed to find Callan" )
+    exit ()
+
+def dump () :
+    n = 0
+    while True :
+        n += 1
+        c = ser.read().decode('ascii')
+        print ( "Dog: ", end='' )
+        print ( n, end='' )
+        print ( " ", end='' );
+        print ( len(c), end='' )
+        if len(c) != 1 :
+            print ( '' )
+            print ( "Timeout\n" );
+            break
+        print ( " ", end='' );
+        cc = c[0]
+        x = ord(cc)
+        print ( hex(x), end='' )
+        if x > 0x20 and x < 0x7f :
+            print ( ' ', cc )
+        print ( "" )
+
+
+# We see
+# >e a0
+# 0000A0: 0020? .
+# >
+# Note that the characters we write are echoed
+
+def examine ( addr ) :
+
+    #cmd = "E a0\r"
+    cmd = "E "
+    cmd += format ( addr, 'x' )
+    #print ( cmd )
+    cmd += '\r.\r'
+    ser.write ( cmd.encode('ascii') )
+
+    flush_to ( '\n' )
+    #dump ()
+    raw = read_to ( '>' )
+    # trim off "? .\r\n>
+    res = raw[:-6]
+    print ( res )
+
+def peek ( addr ) :
+    cmd = "E "
+    cmd += format ( addr, 'x' )
+    cmd += '\r.\r'
+    ser.write ( cmd.encode('ascii') )
+
+    flush_to ( '\n' )
+    raw = read_to ( '>' )
+    # trim off "? .\r\n>
+    res = raw[:-6]
+    w = res.split ( ": " )
+    return int ( w[1], 16)
+
+def poke ( addr, val ) :
+
+    cmd = "E "
+    cmd += format ( addr, 'x' )
+    cmd += '\r'
+    ser.write ( cmd.encode('ascii') )
+
+    x = read_until ( "? " )
+    #print ( "until: ", x )
+
+    cmd = format ( val, 'x' )
+    cmd += '\r.\r'
+    ser.write ( cmd.encode('ascii') )
+    x = read_until ( ">" )
+    #print ( "until: ", x )
+
+    #dump ()
+
+    
+def debug () :
+
+    sync ()
+    examine ( 0xa0 )
+    examine ( 0xa2 )
+    examine ( 0x3f00 )
+
+    addr = 0xa2
+    x = peek ( addr )
+    print ( "peek: ",hex(addr), " ", hex(x) )
+
+    print ( "Start poke --" )
+    addr = 0x10000
+    examine ( addr )
+    poke ( addr, 0xabcd )
+    examine ( addr )
+
+def chug () :
+
+    n = 0
+    sync ()
+
+    while True :
+        n += 1
+        print ( "{:5d} ".format(n), end='' )
+        examine ( 0x100 )
+
+def slug () :
+    sync ()
+
+    addr = 0
+    while addr < 0x20000 :
+        examine ( addr )
+        addr += 0x1000
+
+first = "first.img"
+base = 0x10000
+
+def im_load () :
+
+    sync ()
+
+    nb = os.stat ( first ).st_size
+    print ( nb, "bytes in image" )
+    with open ( first, mode='rb') as file:
+        image = file.read()
+    #print ( len(image) )
+
+    i = 0
+    addr = base
+    while i < nb :
+        val = image[i]*256 + image[i+1]
+        poke ( addr, val )
+        i += 2
+        addr += 2
+
+    i = 0
+    addr = base
+    while i < nb :
+        examine ( addr )
+        addr += 2
+        i += 2
+
+#    print ( hex(image[0]) )
+#    print ( hex(image[1]) )
+#    val = image[0]*256 + image[1]
+#    print ( hex(val) )
+
+
+# ------------------------------------------------------
+
+#ser = serial.Serial ( device, baud, timeout=None )
+ser = serial.Serial ( device, baud, timeout=2 )
+print ( "Using port " + ser.name )
+print ( " baud rate: {}".format(baud) )
+
+#debug ()
+#chug ()
+#slug ()
+im_load ()
+
+ser.close()
+
+# THE END

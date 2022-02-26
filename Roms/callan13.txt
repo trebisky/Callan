@@ -221,7 +221,9 @@
 
 ; dividing the main (4 Mhz) clock by 13 along with the divide by 16
 ; selected in UART initialization yields 19230.77,
-; i.e. 19200 baud
+; i.e. 19200 baud -- however, experiments indicate that the
+; UART is running at 9600, so there is another divide by 2
+; hiding somewhere.
 
   200192:	33fc ff04 0080 	movew #0xff04,0x800002	; select timer 4, mode reg
   200198:	0002
@@ -347,9 +349,14 @@
   2002f2:	4eb9 0020 1eae 	jsr 0x201eae		; go run the extension ROM
   2002f8:	4e71           	nop
 
-; fall through here if the extension ROM returns
-; this seems unlikely, given that it would fall into
-; exception handling code
+; fall through here if the extension ROM returns,
+; or if it does not exist.
+; I'll note that the Callan extension ROM never returns.
+; so falling through into this code is what runs the
+; ROM monitor.
+; Note that this rattles through into exception handling code
+; the next 3 instructions must set up something that looks
+; like and extension stack frame.
 
 ; Jumped to from below
   2002fa:	2f3c 0000 0000 	movel #0,%sp@-
@@ -887,6 +894,8 @@
   200978:	4cee 3000 fff8 	moveml %fp@(-8),%a4-%a5
   20097e:	4e5e           	unlk %fp
   200980:	4e75           	rts
+
+; called from several places
   200982:	4e56 fff4      	linkw %fp,#-12
   200986:	48ee 20c0 fff4 	moveml %d6-%d7/%a5,%fp@(-12)
   20098c:	1e2e 000b      	moveb %fp@(11),%d7
@@ -901,7 +910,7 @@
   2009ae:	6608           	bnes 0x2009b8
   2009b0:	6038           	bras 0x2009ea
   2009b2:	4eb9 0020 0f2a 	jsr 0x200f2a
-  2009b8:	2f3c 0000 000a 	movel #0xa,%sp@-
+  2009b8:	2f3c 0000 000a 	movel #0xa,%sp@-	; newline
   2009be:	4eb9 0020 0e78 	jsr 0x200e78		; putc
   2009c4:	6022           	bras 0x2009e8
   2009c6:	6022           	bras 0x2009ea
@@ -919,9 +928,13 @@
   2009f0:	4e5e           	unlk %fp
   2009f2:	4e75           	rts
 
+; for the above
+; 00201d7b 55 6e6b 6e6f 776e 206d 6f64 650a 00 "Unknown mode"
+
 ; Almost all exception handlers call this
   2009f4:	4e56 ffec      	linkw %fp,#-20
   2009f8:	48ee 20c0 ffec 	moveml %d6-%d7/%a5,%fp@(-20)
+
   2009fe:	2a7c 0000 0200 	moveal #0x200,%a5
   200a04:	202e 004c      	movel %fp@(76),%d0
   200a08:	7210           	moveq #0x10,%d1
@@ -2512,6 +2525,7 @@
   201e9a:	6606           	bnes 0x201ea2
   201e9c:	4ef9 0020 00a4 	jmp 0x2000a4
 
+; read uart status and jump
   201ea2:	1039 0060 0002 	moveb 0x600002,%d0	; port A status
   201ea8:	4ef9 0020 0092 	jmp 0x200092
 

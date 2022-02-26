@@ -12,8 +12,8 @@
  * The assembler is smart enough to convert
  * this to a moveal
 	moveal #0x1fffe,%sp
- */
 	movel #0x1fffe,%sp
+ */
 
 /* this would be right for the boot rom, but not
  * for an extension rom.
@@ -25,4 +25,6 @@
  */
 	bsr	start
 
+/*
 loop:	bra	loop
+*/

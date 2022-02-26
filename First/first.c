@@ -1,14 +1,22 @@
-/* start.c
+/* first.c
  *
- * The first bit of C code that gets run
- * 10-30-2006
+ * The first bit of C code that got loaded
+ * onto the Callan board and run.
+ *  2-25-2022  Tom Trebisky
+ *
+ * This spits out endless "A" characters.
+ * It relies on the bootrom already having
+ * initialized the baud rate (9600) and uart.
  */
 
 typedef volatile unsigned short vu_short;
+typedef volatile unsigned char vu_char;
 
 struct uart {
-	vu_short data;
-	vu_short csr;
+	vu_char data;
+	char _pad0;
+	vu_char csr;
+	char _pad1;
 };
 
 #define CSR_TBE		0x04
@@ -28,9 +36,19 @@ delay_x ( void )
 }
 
 void
-putc ( int c )
+putca ( int c )
 {
 	struct uart *up = UART0_BASE;
+
+	while ( ! (up->csr & CSR_TBE) )
+	    ;
+	up->data = c;
+}
+
+void
+putcb ( int c )
+{
+	struct uart *up = UART1_BASE;
 
 	while ( ! (up->csr & CSR_TBE) )
 	    ;
@@ -41,7 +59,12 @@ void
 start ( void )
 {
 	for ( ;; )
-	    putc ( 'X' );
+	    putca ( 'A' );
+	    /*
+	    putcb ( 'B' );
+	    putca ( 'A' );
+	    putcb ( 'B' );
+	    */
 }
 
 /* THE END */

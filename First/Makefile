@@ -14,33 +14,28 @@
 
 # This is from a Fedora package for F34 as of 2-2022
 # It does have the m68010 compiler switch
-CC = m68k-linux-gnu-gcc -m68010 -O2 -fno-builtin
-AS = m68k-linux-gnu-as -m68010
+# However, the chip in the Callan is a 68000
+#CC = m68k-linux-gnu-gcc -m68010 -O2 -fno-builtin
+CC = m68k-linux-gnu-gcc -m68000 -fno-builtin
+AS = m68k-linux-gnu-as -m68000
 LD = m68k-linux-gnu-ld
+DUMP = m68k-linux-gnu-objdump -d
 
 OBJS = rom.o first.o
 
-all: rom_image
-
-#copy:	split
-#	cp rom_odd rom_even ..
-#
-#split:	rom_image
-#	xsplit_rom rom_image rom_odd rom_even
-
-clean:
-	rm -f $(OBJS) rom_image 
-	rm -f rom_even rom_odd
-	rm -f rom.elf first.s
+all: first.img
 
 # Here is the crucial part, linking.
 #  the -s switch says to strip the symbol table.
 #  note the handy binary image output option!
-rom_image:	$(OBJS)
-	$(LD) -T rom.lds --oformat binary -s -o rom_image $(OBJS)
+first.img:	$(OBJS)
+	$(LD) -T rom.lds --oformat binary -s -o first.img $(OBJS)
 
-rom.elf:	$(OBJS)
-	$(LD) -T rom.lds -s -o rom.elf $(OBJS)
+first.elf:	$(OBJS)
+	$(LD) -T rom.lds -s -o first.elf $(OBJS)
+
+first.dump:	first.elf
+	$(DUMP) first.elf >first.dump
 
 rom.o:		rom.s
 	$(AS) -o rom.o rom.s
@@ -51,13 +46,9 @@ first.o:	first.c
 first.s:	first.c
 	$(CC) -S first.c
 
-#-------------------
-
-ld68k.lds:
-	ld68k --verbose >ld68k.lds
-
-version:
-	cc68k --version
-	ld68k --version
+clean:
+	rm -f $(OBJS) first.img 
+	rm -f rom_even rom_odd
+	rm -f first.elf first.s
 
 # THE END
