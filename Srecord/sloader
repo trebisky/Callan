@@ -1,5 +1,12 @@
 #!/bin/python3
 
+# "sloader"
+
+# The goal is to have a program that will download S-records
+# to the Callan bootrom.
+# I do quite a lot of other fooling around with the bootrom
+# also.
+
 # First do: dnf install python3-pyserial
 
 # This was originally written for EBAZ4205 reverse engineering.
@@ -291,6 +298,7 @@ def go ( addr ) :
 #  Feb 26 13:58:59 trona kernel: usb 1-1.4: SerialNumber: FTC9S0QV
 #  Feb 26 13:58:59 trona kernel: ftdi_sio 1-1.4:1.0: FTDI USB Serial Device converter detected
 #  Feb 26 13:58:59 trona kernel: usb 1-1.4: Detected FT232BM
+#
 # While writing this, I switch to a different dongle:
 #  Feb 26 14:01:13 trona kernel: usb 1-1.4: new full-speed USB device number 7 using ehci-pci
 #  Feb 26 14:01:13 trona kernel: usb 1-1.4: New USB device found, idVendor=067b, idProduct=2303, bcdDevice= 3.00
@@ -301,6 +309,8 @@ def go ( addr ) :
 #  Feb 26 14:01:13 trona kernel: usbserial: USB Serial support registered for pl2303
 #  Feb 26 14:01:13 trona kernel: pl2303 1-1.4:1.0: pl2303 converter detected
 #  Feb 26 14:01:13 trona kernel: usb 1-1.4: pl2303 converter now attached to ttyUSB1
+#
+# This newer (different) usb-serial dongle has almost entirely fixed the problem.
 
 def watch_it ( ignore_timeout ) :
     while True :
