@@ -440,9 +440,13 @@ def terminal () :
 
 # ------------------------------------------------------
 
+
 def get_srec ( path, base ) :
+    #tos_path = "./tos"
+    tos_path = "/usr/local/bin/tos"
+
     hbase = format ( base, 'x' )
-    process = Popen(['./tos', path, hbase], stdout=PIPE )
+    process = Popen ( [tos_path, path, hbase], stdout=PIPE )
     (out,err) = process.communicate()
 
     #print ( out.decode('ascii') )
@@ -483,8 +487,18 @@ def run_image ( path, base ) :
 
 # ------------------------------------------------------
 
-first = "first.img"
-base = 0x10000
+if len(sys.argv) < 2 :
+    print ( "Usage: sloader im_path [addr]" )
+    exit ()
+
+im_path = sys.argv[1]
+
+if len(sys.argv) == 3 :
+    im_base = int(sys.argv[2], 16)
+else :
+    im_base = 0x10000
+
+print ( "Loading", im_path, "at:", hex(im_base) )
 
 #ser = serial.Serial ( device, baud, timeout=None )
 ser = serial.Serial ( device, baud, timeout=2 )
@@ -495,9 +509,9 @@ print ( " baud rate: {}".format(baud) )
 #chug ()
 #slug ()
 
-#im_load ( first, base )
+#im_load ( im_path, im_base )
 
-run_image ( first, base )
+run_image ( im_path, im_base )
 terminal ()
 
 ser.close()

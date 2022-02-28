@@ -7,3 +7,7 @@ get:
 
 tos: ../toS/tos
 	cp ../toS/tos .
+
+install:	sloader tos
+	cp sloader /usr/local/bin
+	cp tos /usr/local/bin
