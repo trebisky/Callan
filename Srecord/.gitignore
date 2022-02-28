@@ -8,3 +8,4 @@ zzz
 try
 *.img
 *.log
+*.srec

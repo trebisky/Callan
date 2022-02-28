@@ -9,6 +9,16 @@
 
 # Now being used with the Callan 2-25-2022
 
+# Working on this has exposed a couple of shortcomings in Python serial
+#
+# one is that it doesn't play nicely with a thread writing
+#  while a read is blocked on the serial port
+#  We work around this one with a message queue
+#
+# the other is some mischief involving \r and \n when reading.
+#  this makes for some garbled output in terminal mode.
+#  At this point we just put up with it.
+
 import os
 import sys
 import serial
@@ -16,6 +26,7 @@ import threading
 import tty
 import queue
 import time
+from subprocess import Popen, PIPE
 
 device = "/dev/ttyUSB1"
 baud = 9600
@@ -211,15 +222,15 @@ def slug () :
         examine ( addr )
         addr += 0x1000
 
-first = "first.img"
-base = 0x10000
+# This was used before we had S-record loading.
+# It works, but is very slow.
+# It uses poke to install the image.
+def im_load_slow ( path, base ) :
 
-def im_load () :
-
-    nb = os.stat ( first ).st_size
+    nb = os.stat ( path ).st_size
     print ( "Loading a ", nb, " byte image" )
 
-    with open ( first, mode='rb') as file:
+    with open ( path, mode='rb') as file:
         image = file.read()
     #print ( len(image) )
 
@@ -419,14 +430,51 @@ def terminal () :
 
 # ------------------------------------------------------
 
-def run_image () :
+def get_srec ( path, base ) :
+    hbase = format ( base, 'x' )
+    process = Popen(['./tos', path, hbase], stdout=PIPE )
+    (out,err) = process.communicate()
+
+    #print ( out.decode('ascii') )
+    lines = out.decode('ascii').split('\r\n')
+
+    # delete bogus blank line at end
+    return lines[:-1]
+
+def send_srec ( sline ) :
+    sline += '\r'
+
+    # A retry loop, just in case
+    for _ in range(4):
+        ser.write ( sline.encode('ascii') )
+        #dump ()
+        # As a response we get the echo, then
+        # "02Y>" or some such.
+        # The "Y" indicates success.
+        resp = read_until ( '>' )
+        if resp[-2] == 'Y' :
+            break
+        print ( "?", end='', flush=True )
+
+# This downloads S records
+def im_load ( path, base ) :
+    sr = get_srec ( path, base )
+    print ( "Loading ... ", end='', flush=True )
+    for l in sr :
+        send_srec ( l )
+    print ( "Done" )
+
+
+def run_image ( path, base ) :
     sync ()
 
-    im_load ()
+    im_load ( path, base )
     go ( base )
 
-    terminal ()
+# ------------------------------------------------------
 
+first = "first.img"
+base = 0x10000
 
 #ser = serial.Serial ( device, baud, timeout=None )
 ser = serial.Serial ( device, baud, timeout=2 )
@@ -436,9 +484,10 @@ print ( " baud rate: {}".format(baud) )
 #debug ()
 #chug ()
 #slug ()
-#im_load ()
 
-#run_image ()
+#im_load ( first, base )
+
+run_image ( first, base )
 terminal ()
 
 ser.close()

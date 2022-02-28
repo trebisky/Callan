@@ -22,8 +22,6 @@
 
 #include "srecord.h"
 
-unsigned int base_addr = 0x1000;
-
 void
 error ( char *msg )
 {
@@ -52,7 +50,7 @@ read_image ( char *path )
     if ( n < 2 )
 	error ( "Image empty" );
 
-    printf ( "Image read, %d bytes\n", n );
+    // printf ( "Image read, %d bytes\n", n );
     n_image = n;
 
     close ( fd );
@@ -80,7 +78,7 @@ emit_trailer ( FILE *out_file, unsigned int addr )
     int s;
 
     // s = New_SRecord ( SRECORD_TYPE_S8, base_addr, image, n_image, &srec );
-    s = New_SRecord ( SRECORD_TYPE_S8, base_addr, image, 0, &srec );
+    s = New_SRecord ( SRECORD_TYPE_S8, addr, image, 0, &srec );
     if ( s != SRECORD_OK )
 	error ( "Fail to make trailer S record" );
     s = Write_SRecord ( &srec, out_file );
@@ -91,7 +89,7 @@ emit_trailer ( FILE *out_file, unsigned int addr )
 #define CHUNK	32
 
 void
-gen_srec ( FILE *out_file )
+gen_srec ( FILE *out_file, unsigned long base_addr )
 {
     unsigned int addr;
     int nio;
@@ -103,31 +101,35 @@ gen_srec ( FILE *out_file )
     while ( nout < n_image ) {
 	nio = n_image - nout;
 	if ( nio > CHUNK ) nio = CHUNK;
-	printf ( "Write: %d\n", nio );
 	emit_srec ( out_file, addr, &image[nout], nio );
 	addr += nio;
 	nout += nio;
     }
 
-    emit_trailer ( out_file, addr );
+    emit_trailer ( out_file, base_addr );
 }
 
 int
 main ( int argc, char **argv )
 {
-    FILE *sfile;
+    // FILE *sfile;
+    unsigned long base;
 
     argc--;
     argv++;
 
-    if ( argc != 1 )
-	error ( "usage: tos file" );
+    if ( argc != 2 )
+	error ( "usage: tos file hex_base" );
 
+    base = strtol ( argv[1], NULL, 16 );
+    // printf ( "Base = %08x\n", base );
     read_image ( argv[0] );
 
-    sfile = fopen ( "test.srec", "w" );
-    gen_srec ( sfile );
-    fclose ( sfile );
+    // sfile = fopen ( "test.srec", "w" );
+    // gen_srec ( sfile );
+    // fclose ( sfile );
+
+    gen_srec ( stdout, base );
 	    
     return 0;
 }
