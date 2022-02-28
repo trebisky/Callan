@@ -15,8 +15,12 @@
 # This is from a Fedora package for F34 as of 2-2022
 # It does have the m68010 compiler switch
 # However, the chip in the Callan is a 68000
-#CC = m68k-linux-gnu-gcc -m68010 -O2 -fno-builtin
-CC = m68k-linux-gnu-gcc -m68000 -fno-builtin
+# We get a 112 byte executable without optimzation
+# 84 bytes if we optimize.
+# The optimized code runs just fine.
+CC = m68k-linux-gnu-gcc -m68000 -O2 -fno-builtin
+#CC = m68k-linux-gnu-gcc -m68000 -fno-builtin
+
 AS = m68k-linux-gnu-as -m68000
 LD = m68k-linux-gnu-ld
 DUMP = m68k-linux-gnu-objdump -d
@@ -48,7 +52,7 @@ first.s:	first.c
 
 clean:
 	rm -f $(OBJS) first.img 
-	rm -f rom_even rom_odd
+	rm -f *.o *.dump
 	rm -f first.elf first.s
 
 # THE END

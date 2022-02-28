@@ -9,21 +9,29 @@
 
 ; 0xe0000 - never touches this (context reg / input switches)
 
-; IO addresses on the multibus:
+; IO addresses on the multibus that I see in this ROM:
 ; 0x1ff900 - CFC
 ; 0x1ff8a0 - CWC
 ; 0x1ff880 - ??
 
+; examining the jumpers on the board, I see:
 ; the jumpers on our CWC seem to be 00A0
 ; the jumpers on our CFC seem to be 0100
 
 ; it looks to me like the base address for multibus IO
 ; is 0x1ff800 which would be consistent with the jumpers
-; above.  The manual though simply says 0x1f0000
+; above.
+; This mapping is set up by this extension ROM and differs
+; from the base address set up by the bootroms and
+; described in the manual.
+; The manual though simply says 0x1f0000
 ; This is all about page map setup which places multibus IO
 ; for 0-0x7ff at 0x1ff800 to 0x1fffff
-; This is a Callan mapping, which differs from what the CPU manual
-; describes.
+; This is a Callan mapping, and it differs
+; from what the PM68K CPU manual describes.
+; Note also that this Callan mapping requires that multibus IO
+; cards be jumpered in the lower half of the address space.
+; (i.e. with base addresses less than 0x800.
 
 ; the CPU board has 256K of ram
 ; it is from 0 to 0x3ffff

@@ -10,7 +10,12 @@
 # Now being used with the Callan 2-25-2022
 
 import os
+import sys
 import serial
+import threading
+import tty
+import queue
+import time
 
 device = "/dev/ttyUSB1"
 baud = 9600
@@ -79,7 +84,9 @@ def probe () :
             return True
         if len(c) == 0 :
             return False
+        #print ( "probe, skip: ", c )
 
+# This is not as robust as I would like.
 def sync () :
     n = flush ();
     print ( n, " chars flushed" )
@@ -209,10 +216,9 @@ base = 0x10000
 
 def im_load () :
 
-    sync ()
-
     nb = os.stat ( first ).st_size
-    print ( nb, "bytes in image" )
+    print ( "Loading a ", nb, " byte image" )
+
     with open ( first, mode='rb') as file:
         image = file.read()
     #print ( len(image) )
@@ -237,8 +243,190 @@ def im_load () :
 #    val = image[0]*256 + image[1]
 #    print ( hex(val) )
 
+def go ( addr ) :
+
+    cmd = "g "
+    cmd += format ( addr, 'x' )
+    cmd += '\r'
+    ser.write ( cmd.encode('ascii') )
+
+# for some reason, whenever I open the serial port I get a big bunch
+# (like 260 or so) of trash characters.  So if I exit this and jump
+# into picocom, I will get a bunch of rubbish.  Also sometimes the
+# Callan also receives rubbish which kicks it into the weeds.
+# Staying in one session and using this to watch the output avoids
+# this unpleasant business
+#
+# I am suspicious that this is some bug in my USB to serial dongle.
+# As long as I have the ttyUSB1 device open, either via picocom or
+# this code, there is no problem.  But when I exit either, things
+# go unstable, the Callan gets bombarded by all kinds of trash and
+# sometimes the Fail light goes on after it reports some kind of
+# abort.  Ultimately the ROM monitor should be immune to whatever
+# rubbish comes its way, but it isn't.
+#
+# I see:
+#  Abort at 200EF6
+#  Abort at 200E34
+#  Abort at 200EC8
+#  Abort at 200E2C
+#  Abort at 200EEA
+# The ancient dongle I am using identifies itself as:
+#  Feb 26 13:58:59 trona kernel: usb 1-1.4: new full-speed USB device number 6 using ehci-pci
+#  Feb 26 13:58:59 trona kernel: usb 1-1.4: New USB device found, idVendor=0403, idProduct=6001, bcdDevice= 4.00
+#  Feb 26 13:58:59 trona kernel: usb 1-1.4: New USB device strings: Mfr=1, Product=2, SerialNumber=3
+#  Feb 26 13:58:59 trona kernel: usb 1-1.4: Product: usb serial converter
+#  Feb 26 13:58:59 trona kernel: usb 1-1.4: Manufacturer: FTDI
+#  Feb 26 13:58:59 trona kernel: usb 1-1.4: SerialNumber: FTC9S0QV
+#  Feb 26 13:58:59 trona kernel: ftdi_sio 1-1.4:1.0: FTDI USB Serial Device converter detected
+#  Feb 26 13:58:59 trona kernel: usb 1-1.4: Detected FT232BM
+# While writing this, I switch to a different dongle:
+#  Feb 26 14:01:13 trona kernel: usb 1-1.4: new full-speed USB device number 7 using ehci-pci
+#  Feb 26 14:01:13 trona kernel: usb 1-1.4: New USB device found, idVendor=067b, idProduct=2303, bcdDevice= 3.00
+#  Feb 26 14:01:13 trona kernel: usb 1-1.4: New USB device strings: Mfr=1, Product=2, SerialNumber=0
+#  Feb 26 14:01:13 trona kernel: usb 1-1.4: Product: USB-Serial Controller
+#  Feb 26 14:01:13 trona kernel: usb 1-1.4: Manufacturer: Prolific Technology Inc.
+#  Feb 26 14:01:13 trona kernel: usbcore: registered new interface driver pl2303
+#  Feb 26 14:01:13 trona kernel: usbserial: USB Serial support registered for pl2303
+#  Feb 26 14:01:13 trona kernel: pl2303 1-1.4:1.0: pl2303 converter detected
+#  Feb 26 14:01:13 trona kernel: usb 1-1.4: pl2303 converter now attached to ttyUSB1
+
+def watch_it ( ignore_timeout ) :
+    while True :
+        c = ser.read()
+        if len(c) == 0 :
+            if ignore_timeout :
+                continue
+            else :
+                break
+        if c[0] >= 128 :
+            continue
+        print ( c.decode('ascii'), end='', flush=True )
+
+def watch () :
+    watch_it ( True )
 
 # ------------------------------------------------------
+# ------------------------------------------------------
+
+# Here is a little terminal emulator
+# 
+# I first tried doing this with a thread to watch the keyboard
+# and the mainline in a loop, blocked reading the serial input.
+# This did not work.  I think it is a flaw in python-serial
+# where the read on serial is blocking writes on serial.
+# i.e. python-serial is not thread friendly.
+#
+# I discovered some code by "eRCaGuy" who wrote a python serial
+# terminal gadget.  He also has a keyboard thread, but he does
+# 2 extra things.
+# - he sends keyboard input via a queue to the mainline
+# - the mainline never blocks, but polls serial input
+# polling is of course ugly and unfortunate, but with a
+# sleep to make it sort of friendly, it works.
+
+# Here is what does not work
+def keyboard_thread_BAD () :
+    print ( "KB start" )
+    fd = sys.stdin.fileno()
+    tty.setcbreak(fd)
+
+    while True :
+        c = sys.stdin.read(1)
+        if c == '\n' :
+            c = '\r'
+        #print ( type(c) )
+        print ( "Send: ", c, " hex = ", hex(ord(c[0])) )
+        ser.write ( c.encode('ascii') )
+
+def keyboard_thread () :
+
+    # This really is not necessary
+    kb_sem.wait ()
+    kb_sem.clear ()
+
+    while True :
+        inp = input ()
+        inQ.put ( inp )
+
+# I really wanted to use filter, and went through a fair
+# bit of trouble trying to figure out how to turn the
+# filter iternator object back into a bytestring.
+# but eventually abandoned this for what follows
+def cleanup_FANCY ( line ) :
+    xclean = filter(lambda x: x < 128 and x != ord('\r'), line)
+    yclean = bytes(list(xclean))
+
+# note that a python byte string is immutable,
+# so we build a list, then convert it.
+def cleanup ( line ) :
+    clean = []
+
+    for b in line :
+        if b == 0 :
+            continue
+        if b > 127 :
+            continue
+        if b == ord('\r') :
+            continue
+        # if we don't do this, every newline
+        # gets doubled by the write
+        if b == ord('\n') :
+            b = ord('\r')
+        clean.append ( b )
+
+    return bytes ( clean )
+
+# ser.read() returns bytes
+# filter returns some stupid filter iterable object
+# after an hour of work we find (the admittedly simple)
+# way to turn it back into bytes
+# so we can feed it to decode
+def terminal () :
+    global inQ
+    global kb_sem
+
+    inQ = queue.Queue ()
+    kb_sem = threading.Event ()
+
+    #log = open ( "log.log", "w" )
+
+    kb = threading.Thread ( target=keyboard_thread )
+    kb.start ()
+
+    kb_sem.set ()
+
+    while True :
+        ndata = ser.inWaiting ()
+        if ndata > 0 :
+            raw = ser.read ( ndata )
+            yclean = cleanup ( raw )
+            data = yclean.decode('ascii')
+
+            #log_data = repr ( yclean )
+            #log_data = repr ( data )
+            #log.write ( log_data )
+            #log.write ( "\n" )
+            #log.flush ()
+
+            print ( data, end='', flush=True )
+        if inQ.qsize () > 0 :
+            inp = inQ.get ()
+            inp += '\r'
+            enc = inp.encode('ascii')
+            ser.write ( enc )
+        time.sleep ( 0.02 )
+
+# ------------------------------------------------------
+
+def run_image () :
+    sync ()
+
+    im_load ()
+    go ( base )
+
+    terminal ()
+
 
 #ser = serial.Serial ( device, baud, timeout=None )
 ser = serial.Serial ( device, baud, timeout=2 )
@@ -248,7 +436,10 @@ print ( " baud rate: {}".format(baud) )
 #debug ()
 #chug ()
 #slug ()
-im_load ()
+#im_load ()
+
+#run_image ()
+terminal ()
 
 ser.close()
 

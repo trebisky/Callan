@@ -1,5 +1,5 @@
+tos
 *.o
-rom_image
 *.elf
 *.dis
 OLD
@@ -7,4 +7,4 @@ OLD/*
 zzz
 try
 *.img
-*.log
+*.srec

@@ -12,6 +12,18 @@
 typedef volatile unsigned short vu_short;
 typedef volatile unsigned char vu_char;
 
+#ifdef notdef
+/* You can do this, but you have to shift data 8 bits
+ * into or out of the top 8 bits.
+ * The scheme below avoids all these shifts and
+ * is a better choice I think.
+ */
+struct uart {
+	vu_short data;
+	vu_short csr;
+};
+#endif
+
 struct uart {
 	vu_char data;
 	char _pad0;
@@ -35,20 +47,22 @@ delay_x ( void )
 	    ;
 }
 
+#ifdef notdef
 void
-putca ( int c )
+putc ( int c )
 {
 	struct uart *up = UART0_BASE;
 
-	while ( ! (up->csr & CSR_TBE) )
+	while ( ! ((up->csr>>8) & CSR_TBE) )
 	    ;
-	up->data = c;
+	up->data = c << 8;
 }
+#endif
 
 void
-putcb ( int c )
+putc ( int c )
 {
-	struct uart *up = UART1_BASE;
+	struct uart *up = UART0_BASE;
 
 	while ( ! (up->csr & CSR_TBE) )
 	    ;
@@ -59,12 +73,7 @@ void
 start ( void )
 {
 	for ( ;; )
-	    putca ( 'A' );
-	    /*
-	    putcb ( 'B' );
-	    putca ( 'A' );
-	    putcb ( 'B' );
-	    */
+	    putc ( 'A' );
 }
 
 /* THE END */
