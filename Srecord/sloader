@@ -390,10 +390,6 @@ def cleanup ( line ) :
             continue
         if b == ord('\r') :
             continue
-        # if we don't do this, every newline
-        # gets doubled by the write
-        if b == ord('\n') :
-            b = ord('\r')
         clean.append ( b )
 
     return bytes ( clean )
@@ -403,7 +399,7 @@ def cleanup ( line ) :
 # after an hour of work we find (the admittedly simple)
 # way to turn it back into bytes
 # so we can feed it to decode
-def terminal () :
+def terminal_guts () :
     global inQ
     global kb_sem
 
@@ -417,10 +413,18 @@ def terminal () :
 
     kb_sem.set ()
 
+    fd = ser.fileno ()
+
     while True :
         ndata = ser.inWaiting ()
         if ndata > 0 :
-            raw = ser.read ( ndata )
+
+            # This os.read() is probably not necessary
+            # I got the results I wanted by turning off
+            # echo on stdin.
+            # raw = ser.read ( ndata )
+            raw = os.read ( fd, ndata )
+
             yclean = cleanup ( raw )
             data = yclean.decode('ascii')
 
@@ -437,6 +441,20 @@ def terminal () :
             enc = inp.encode('ascii')
             ser.write ( enc )
         time.sleep ( 0.02 )
+
+# This makes for clean output, but you have to
+# type blind.  The root problem is that we get
+# echo from stdin (i.e. input()) and then again
+# from the Callan itself.
+def terminal () :
+        try :
+            os.system("stty -echo")
+            terminal_guts ()
+        except:
+            os.system("stty echo")
+        finally:
+            os.system("stty echo")
+
 
 # ------------------------------------------------------
 
@@ -472,8 +490,10 @@ def send_srec ( sline ) :
 
 # This downloads S records
 def im_load ( path, base ) :
+    nb = os.stat ( path ).st_size
+    # print ( "Loading a ", nb, " byte image" )
     sr = get_srec ( path, base )
-    print ( "Loading ... ", end='', flush=True )
+    print ( "Loading", nb, "bytes ... ", end='', flush=True )
     for l in sr :
         send_srec ( l )
     print ( "Done" )
@@ -508,10 +528,10 @@ print ( " baud rate: {}".format(baud) )
 #debug ()
 #chug ()
 #slug ()
-
 #im_load ( im_path, im_base )
 
 run_image ( im_path, im_base )
+
 terminal ()
 
 ser.close()
