@@ -12,7 +12,10 @@
 ; IO addresses on the multibus that I see in this ROM:
 ; 0x1ff900 - CFC
 ; 0x1ff8a0 - CWC
-; 0x1ff880 - ??
+; 0x1ff880 - MSC (a multibus device I don't have)
+
+; Based on the menus in this ROM, the unknown device is probably
+; the "MSC-9205" winchester
 
 ; RAM
 ; 00000 - 3ffff is on board ram
@@ -436,7 +439,7 @@
    2038c:	2f3c ffff ffff 	movel #-1,%sp@-
    20392:	2f3c 0002 2e7e 	movel #0x22e7e,%sp@-
    20398:	486e ff80      	pea %fp@(-128)
-   2039c:	4eb9 0002 1a34 	jsr 0x21a34
+   2039c:	4eb9 0002 1a34 	jsr 0x21a34		; get_user ()
    203a2:	defc 000c      	addaw #0xc,%sp
    203a6:	4eb9 0040 0000 	jsr 0x400000
    203ac:	4e5e           	unlk %fp
@@ -495,6 +498,7 @@
    20482:	508f           	addql #8,%sp
    20484:	4e5e           	unlk %fp
    20486:	4e75           	rts
+
    20488:	4e56 fffc      	linkw %fp,#-4
    2048c:	4a2f ff7c      	tstb %sp@(-132)
    20490:	2f0d           	movel %a5,%sp@-
@@ -545,6 +549,7 @@
    2053c:	2a5f           	moveal %sp@+,%a5
    2053e:	4e5e           	unlk %fp
    20540:	4e75           	rts
+
    20542:	4e56 0000      	linkw %fp,#0
    20546:	4a2f ff7c      	tstb %sp@(-132)
    2054a:	202e 0008      	movel %fp@(8),%d0
@@ -585,6 +590,7 @@
    205ce:	508f           	addql #8,%sp
    205d0:	4e5e           	unlk %fp
    205d2:	4e75           	rts
+
    205d4:	4e56 ffe8      	linkw %fp,#-24
    205d8:	4a2f ff7c      	tstb %sp@(-132)
    205dc:	48ee 20f0 ffe8 	moveml %d4-%d7/%a5,%fp@(-24)
@@ -841,14 +847,17 @@
    20970:	4e5e           	unlk %fp
    20972:	4e75           	rts
 
+; subroutine fd_io -- one call from diskio
+
    20974:	4e56 ffdc      	linkw %fp,#-36
    20978:	4a2f ff7c      	tstb %sp@(-132)
    2097c:	48ee 30fc ffdc 	moveml %d2-%d7/%a4-%a5,%fp@(-36)
+
    20982:	2a6e 0008      	moveal %fp@(8),%a5
    20986:	282d 0218      	movel %a5@(536),%d4
    2098a:	2f2d 021c      	movel %a5@(540),%sp@-
    2098e:	2f04           	movel %d4,%sp@-
-   20990:	4eb9 0002 2c0c 	jsr 0x22c0c
+   20990:	4eb9 0002 2c0c 	jsr 0x22c0c		; math_x
    20996:	508f           	addql #8,%sp
    20998:	2600           	movel %d0,%d3
    2099a:	202d 020c      	movel %a5@(524),%d0
@@ -856,21 +865,21 @@
    209a2:	2400           	movel %d0,%d2
    209a4:	2f03           	movel %d3,%sp@-
    209a6:	2f02           	movel %d2,%sp@-
-   209a8:	4eb9 0002 2b84 	jsr 0x22b84
+   209a8:	4eb9 0002 2b84 	jsr 0x22b84		; math
    209ae:	508f           	addql #8,%sp
    209b0:	2e00           	movel %d0,%d7
    209b2:	2f04           	movel %d4,%sp@-
    209b4:	2f03           	movel %d3,%sp@-
    209b6:	2f02           	movel %d2,%sp@-
-   209b8:	4eb9 0002 2c4c 	jsr 0x22c4c
+   209b8:	4eb9 0002 2c4c 	jsr 0x22c4c		; math_y
    209be:	508f           	addql #8,%sp
    209c0:	2f00           	movel %d0,%sp@-
-   209c2:	4eb9 0002 2b84 	jsr 0x22b84
+   209c2:	4eb9 0002 2b84 	jsr 0x22b84		; math
    209c8:	508f           	addql #8,%sp
    209ca:	2c00           	movel %d0,%d6
    209cc:	2f04           	movel %d4,%sp@-
    209ce:	2f02           	movel %d2,%sp@-
-   209d0:	4eb9 0002 2c4c 	jsr 0x22c4c
+   209d0:	4eb9 0002 2c4c 	jsr 0x22c4c		; math_y
    209d6:	508f           	addql #8,%sp
    209d8:	5280           	addql #1,%d0
    209da:	2a00           	movel %d0,%d5
@@ -885,6 +894,7 @@
    209fa:	2f2e fffc      	movel %fp@(-4),%sp@-
    209fe:	4eb9 0002 0488 	jsr 0x20488
    20a04:	defc 001c      	addaw #0x1c,%sp
+
    20a08:	4cee 30fc ffdc 	moveml %fp@(-36),%d2-%d7/%a4-%a5
    20a0e:	4e5e           	unlk %fp
    20a10:	4e75           	rts
@@ -997,7 +1007,10 @@
    20aee:	4e5e           	unlk %fp
    20af0:	4e75           	rts
 
+; =====================================
+
 ; subroutine hd_1
+
    20af2:	4e56 fff0      	linkw %fp,#-16
    20af6:	4a2f ff7c      	tstb %sp@(-132)
    20afa:	48ee 3840 fff0 	moveml %d6/%a3-%a5,%fp@(-16)
@@ -1015,7 +1028,7 @@
    20b1c:	2f3c 0000 0600 	movel #0x600,%sp@-
    20b22:	2f3c 0000 0001 	movel #1,%sp@-
    20b28:	42a7           	clrl %sp@-
-   20b2a:	4eb9 0002 0bcc 	jsr 0x20bcc		; monster ()
+   20b2a:	4eb9 0002 0bcc 	jsr 0x20bcc		; hd_command ()
    20b30:	defc 001c      	addaw #0x1c,%sp
 
    20b34:	2f3c 0000 0001 	movel #1,%sp@-
@@ -1054,7 +1067,7 @@
    20b90:	2f3c 0000 0600 	movel #0x600,%sp@-
    20b96:	2f3c 0000 0011 	movel #0x11,%sp@-
    20b9c:	2f06           	movel %d6,%sp@-		; d6 = 0, 1, 2, 3
-   20b9e:	4eb9 0002 0bcc 	jsr 0x20bcc		; monster ()
+   20b9e:	4eb9 0002 0bcc 	jsr 0x20bcc		; hd_command ()
    20ba4:	defc 001c      	addaw #0x1c,%sp
 
    20ba8:	5286           	addql #1,%d6		; d6++
@@ -1073,7 +1086,7 @@
 
 ; ===============================
 
-; subroutine "monster" - 7 arguments, 4 calls
+; subroutine "hd_command" - 7 arguments, 4 calls
 
    20bcc:	4e56 ffe8      	linkw %fp,#-24
    20bd0:	4a2f ff7c      	tstb %sp@(-132)
@@ -1160,7 +1173,8 @@
    20cb4:	4e5e           	unlk %fp
    20cb6:	4e75           	rts
 
-; subroutine 
+; ===========================================
+; subroutine  hd_io --  one call from diskio
 
    20cb8:	4e56 ffd8      	linkw %fp,#-40
    20cbc:	4a2f ff7c      	tstb %sp@(-132)
@@ -1171,7 +1185,7 @@
 
    20cce:	2f2d 021c      	movel %a5@(540),%sp@-
    20cd2:	2f04           	movel %d4,%sp@-
-   20cd4:	4eb9 0002 2c0c 	jsr 0x22c0c
+   20cd4:	4eb9 0002 2c0c 	jsr 0x22c0c		; math_x
    20cda:	508f           	addql #8,%sp
 
    20cdc:	2600           	movel %d0,%d3
@@ -1181,7 +1195,7 @@
    20ce6:	2400           	movel %d0,%d2
    20ce8:	2f03           	movel %d3,%sp@-
    20cea:	2f02           	movel %d2,%sp@-
-   20cec:	4eb9 0002 2b84 	jsr 0x22b84
+   20cec:	4eb9 0002 2b84 	jsr 0x22b84		; math
    20cf2:	508f           	addql #8,%sp
 
    20cf4:	2e00           	movel %d0,%d7
@@ -1189,18 +1203,18 @@
    20cf6:	2f04           	movel %d4,%sp@-
    20cf8:	2f03           	movel %d3,%sp@-
    20cfa:	2f02           	movel %d2,%sp@-
-   20cfc:	4eb9 0002 2c4c 	jsr 0x22c4c
+   20cfc:	4eb9 0002 2c4c 	jsr 0x22c4c		; math_y
    20d02:	508f           	addql #8,%sp
 
    20d04:	2f00           	movel %d0,%sp@-
-   20d06:	4eb9 0002 2b84 	jsr 0x22b84
+   20d06:	4eb9 0002 2b84 	jsr 0x22b84		; math
    20d0c:	508f           	addql #8,%sp
 
    20d0e:	2c00           	movel %d0,%d6
 
    20d10:	2f04           	movel %d4,%sp@-
    20d12:	2f02           	movel %d2,%sp@-
-   20d14:	4eb9 0002 2c4c 	jsr 0x22c4c
+   20d14:	4eb9 0002 2c4c 	jsr 0x22c4c		; math_y
    20d1a:	508f           	addql #8,%sp
 
    20d1c:	2a00           	movel %d0,%d5
@@ -1219,14 +1233,19 @@
    20d44:	4854           	pea %a4@
    20d46:	2f3c 0000 0003 	movel #3,%sp@-
    20d4c:	2f2e fff8      	movel %fp@(-8),%sp@-
-   20d50:	4eb9 0002 0bcc 	jsr 0x20bcc		; monster ()
+   20d50:	4eb9 0002 0bcc 	jsr 0x20bcc		; hd_command ()
    20d56:	defc 001c      	addaw #0x1c,%sp
 
    20d5a:	4cee 30fc ffd8 	moveml %fp@(-40),%d2-%d7/%a4-%a5
    20d60:	4e5e           	unlk %fp
    20d62:	4e75           	rts
 
+; ----------------------------------------------
 ; subroutine hd_x()
+;
+; 2 calls from main boot code
+; this may be the top level "boot from hard drive"
+
    20d64:	4e56 fdcc      	linkw %fp,#-564
    20d68:	4a2f ff7c      	tstb %sp@(-132)
    20d6c:	2d7c 0000 0008 	movel #8,%fp@(-24)
@@ -1245,12 +1264,13 @@
    20d92:	42a7           	clrl %sp@-
    20d94:	2f3c 0000 0010 	movel #0x10,%sp@-
    20d9a:	2f2e 0008      	movel %fp@(8),%sp@-	; cmd :
-   20d9e:	4eb9 0002 0bcc 	jsr 0x20bcc		; monster ()
+   20d9e:	4eb9 0002 0bcc 	jsr 0x20bcc		; hd_command ()
    20da4:	defc 001c      	addaw #0x1c,%sp
 
    20da8:	4e5e           	unlk %fp
    20daa:	4e75           	rts
 
+; Unknown multibus device (MSC winchester)
    20dac:	4e56 fff0      	linkw %fp,#-16
    20db0:	4a2f ff7c      	tstb %sp@(-132)
    20db4:	48ee 20c0 fff0 	moveml %d6-%d7/%a5,%fp@(-16)
@@ -1286,6 +1306,7 @@
    20e22:	4e5e           	unlk %fp
    20e24:	4e75           	rts
 
+; IO for unknown multibus device at 0x1ff880 (MSC winchester)
    20e26:	4e56 ffec      	linkw %fp,#-20
    20e2a:	4a2f ff7c      	tstb %sp@(-132)
    20e2e:	48ee 30e0 ffec 	moveml %d5-%d7/%a4-%a5,%fp@(-20)
@@ -1365,6 +1386,7 @@
    20f4a:	4e5e           	unlk %fp
    20f4c:	4e75           	rts
 
+; one call from diskio -- msc_io (MSC winchester - I don't have)
    20f4e:	4e56 ffd8      	linkw %fp,#-40
    20f52:	4a2f ff7c      	tstb %sp@(-132)
    20f56:	48ee 30fc ffd8 	moveml %d2-%d7/%a4-%a5,%fp@(-40)
@@ -1372,7 +1394,7 @@
    20f60:	282d 0218      	movel %a5@(536),%d4
    20f64:	2f2d 021c      	movel %a5@(540),%sp@-
    20f68:	2f04           	movel %d4,%sp@-
-   20f6a:	4eb9 0002 2c0c 	jsr 0x22c0c
+   20f6a:	4eb9 0002 2c0c 	jsr 0x22c0c		; math_x
    20f70:	508f           	addql #8,%sp
    20f72:	2600           	movel %d0,%d3
    20f74:	202d 020c      	movel %a5@(524),%d0
@@ -1380,21 +1402,21 @@
    20f7c:	2400           	movel %d0,%d2
    20f7e:	2f03           	movel %d3,%sp@-
    20f80:	2f02           	movel %d2,%sp@-
-   20f82:	4eb9 0002 2b84 	jsr 0x22b84
+   20f82:	4eb9 0002 2b84 	jsr 0x22b84		; math
    20f88:	508f           	addql #8,%sp
    20f8a:	2e00           	movel %d0,%d7
    20f8c:	2f04           	movel %d4,%sp@-
    20f8e:	2f03           	movel %d3,%sp@-
    20f90:	2f02           	movel %d2,%sp@-
-   20f92:	4eb9 0002 2c4c 	jsr 0x22c4c
+   20f92:	4eb9 0002 2c4c 	jsr 0x22c4c		; math_y
    20f98:	508f           	addql #8,%sp
    20f9a:	2f00           	movel %d0,%sp@-
-   20f9c:	4eb9 0002 2b84 	jsr 0x22b84
+   20f9c:	4eb9 0002 2b84 	jsr 0x22b84		; math
    20fa2:	508f           	addql #8,%sp
    20fa4:	2c00           	movel %d0,%d6
    20fa6:	2f04           	movel %d4,%sp@-
    20fa8:	2f02           	movel %d2,%sp@-
-   20faa:	4eb9 0002 2c4c 	jsr 0x22c4c
+   20faa:	4eb9 0002 2c4c 	jsr 0x22c4c		; math_y
    20fb0:	508f           	addql #8,%sp
    20fb2:	5280           	addql #1,%d0
    20fb4:	2a00           	movel %d0,%d5
@@ -1411,35 +1433,55 @@
    20fde:	2f2e fff8      	movel %fp@(-8),%sp@-
    20fe2:	4eb9 0002 0e26 	jsr 0x20e26
    20fe8:	defc 0020      	addaw #0x20,%sp
+
    20fec:	4cee 30fc ffd8 	moveml %fp@(-40),%d2-%d7/%a4-%a5
    20ff2:	4e5e           	unlk %fp
    20ff4:	4e75           	rts
-   20ff6:	0000 4e56      	orib #0x56,%d0
-   20ffa:	fffc           	.short 0xfffc
+   20ff6:	0000
+
+; =========================
+; subroutine "diskio"
+
+   20ff8:	4e56 fffc	linkw -------
    20ffc:	4a2f ff7c      	tstb %sp@(-132)
    21000:	2f0d           	movel %a5,%sp@-
-   21002:	2a6e 0008      	moveal %fp@(8),%a5
+
+   21002:	2a6e 0008      	moveal %fp@(8),%a5	; arg
    21006:	2015           	movel %a5@,%d0
+
    21008:	0c80 0000 0001 	cmpil #1,%d0
-   2100e:	6726           	beqs 0x21036
-   21010:	0c80 0000 0002 	cmpil #2,%d0
+   2100e:	6726           	beqs 0x21036		; 1 = CWC
+
+   21010:	0c80 0000 0002 	cmpil #2,%d0		; 2 = CFC
    21016:	6714           	beqs 0x2102c
+
    21018:	0c80 0000 0003 	cmpil #3,%d0
    2101e:	6620           	bnes 0x21040
-   21020:	4855           	pea %a5@
-   21022:	4eb9 0002 0f4e 	jsr 0x20f4e
+
+   21020:	4855           	pea %a5@		; 3 = MSC
+   21022:	4eb9 0002 0f4e 	jsr 0x20f4e		; msc_io
    21028:	588f           	addql #4,%sp
+
    2102a:	6028           	bras 0x21054
+
    2102c:	4855           	pea %a5@
-   2102e:	4eb9 0002 0974 	jsr 0x20974
+   2102e:	4eb9 0002 0974 	jsr 0x20974		; fd_io
    21034:	60f2           	bras 0x21028
+
    21036:	4855           	pea %a5@
-   21038:	4eb9 0002 0cb8 	jsr 0x20cb8
+   21038:	4eb9 0002 0cb8 	jsr 0x20cb8		; hd_io () -- CWC
    2103e:	60e8           	bras 0x21028
+
+;  23050 ---- ---- ---- ---- 6469 736b 696f 3a20           diskio: 
+;  23060 756e 6b6e 6f77 6e20 6472 6976 6572 2069   unknown driver i
+;  23070 6e64 6578 206e 756d 6265 722e 0a00 ----   ndex number.
+
    21040:	2f3c 0002 3058 	movel #0x23058,%sp@-
    21046:	4eb9 0002 193e 	jsr 0x2193e		; printf
    2104c:	588f           	addql #4,%sp
+
    2104e:	4eb9 0002 0328 	jsr 0x20328
+
    21054:	2a5f           	moveal %sp@+,%a5
    21056:	4e5e           	unlk %fp
    21058:	4e75           	rts
@@ -1454,7 +1496,7 @@
    2107a:	2007           	movel %d7,%d0
    2107c:	5380           	subql #1,%d0
    2107e:	2f00           	movel %d0,%sp@-
-   21080:	4eb9 0002 2b84 	jsr 0x22b84
+   21080:	4eb9 0002 2b84 	jsr 0x22b84		; math
    21086:	508f           	addql #8,%sp
    21088:	5480           	addql #2,%d0
    2108a:	2c00           	movel %d0,%d6
@@ -1462,12 +1504,12 @@
    21092:	2007           	movel %d7,%d0
    21094:	5380           	subql #1,%d0
    21096:	2f00           	movel %d0,%sp@-
-   21098:	4eb9 0002 2c4c 	jsr 0x22c4c
+   21098:	4eb9 0002 2c4c 	jsr 0x22c4c		; math_y
    2109e:	508f           	addql #8,%sp
    210a0:	2a00           	movel %d0,%d5
    210a2:	2946 0208      	movel %d6,%a4@(520)
    210a6:	4854           	pea %a4@
-   210a8:	4eb9 0002 0ff8 	jsr 0x20ff8
+   210a8:	4eb9 0002 0ff8 	jsr 0x20ff8		; diskio
    210ae:	588f           	addql #4,%sp
    210b0:	2f3c 0000 0200 	movel #0x200,%sp@-
    210b6:	486e fe00      	pea %fp@(-512)
@@ -1566,6 +1608,7 @@
    211c8:	4cee 30e0 ffdc 	moveml %fp@(-36),%d5-%d7/%a4-%a5
    211ce:	4e5e           	unlk %fp
    211d0:	4e75           	rts
+
    211d2:	4e56 f128      	linkw %fp,#-3800
    211d6:	4a2f ff7c      	tstb %sp@(-132)
    211da:	23fc 0000 0001 	movel #1,0x22fb2
@@ -1586,7 +1629,7 @@
    2122a:	2d6e 0034 fde0 	movel %fp@(52),%fp@(-544)
    21230:	2d6e 0038 fde4 	movel %fp@(56),%fp@(-540)
    21236:	486e fbd4      	pea %fp@(-1068)
-   2123a:	4eb9 0002 0ff8 	jsr 0x20ff8
+   2123a:	4eb9 0002 0ff8 	jsr 0x20ff8		; diskio
    21240:	588f           	addql #4,%sp
    21242:	2f3c 0000 01b8 	movel #0x1b8,%sp@-
    21248:	486e fe48      	pea %fp@(-440)
@@ -1686,6 +1729,7 @@
    213e2:	0850
    213e4:	4e5e           	unlk %fp
    213e6:	4e75           	rts
+
    213e8:	4e56 fff8      	linkw %fp,#-8
    213ec:	4a2f ff7c      	tstb %sp@(-132)
    213f0:	2f3c 0000 0001 	movel #1,%sp@-
@@ -1707,6 +1751,7 @@
    21430:	48c0           	extl %d0
    21432:	4e5e           	unlk %fp
    21434:	4e75           	rts
+
    21436:	4e56 fff8      	linkw %fp,#-8
    2143a:	4a2f ff7c      	tstb %sp@(-132)
    2143e:	2f3c 0000 0004 	movel #4,%sp@-
@@ -1726,6 +1771,7 @@
    21478:	202e fffc      	movel %fp@(-4),%d0
    2147c:	4e5e           	unlk %fp
    2147e:	4e75           	rts
+
    21480:	4e56 ffec      	linkw %fp,#-20
    21484:	4a2f ff7c      	tstb %sp@(-132)
    21488:	48ee 00f8 ffec 	moveml %d3-%d7,%fp@(-20)
@@ -1742,7 +1788,7 @@
    214ae:	2f3c 0000 0200 	movel #0x200,%sp@-
    214b4:	206e 0008      	moveal %fp@(8),%a0
    214b8:	2f10           	movel %a0@,%sp@-
-   214ba:	4eb9 0002 2c4c 	jsr 0x22c4c
+   214ba:	4eb9 0002 2c4c 	jsr 0x22c4c		; math_y
    214c0:	508f           	addql #8,%sp
    214c2:	2600           	movel %d0,%d3
    214c4:	206e 0008      	moveal %fp@(8),%a0
@@ -1833,7 +1879,7 @@
    215bc:	672c           	beqs 0x215ea
    215be:	2b46 0a5c      	movel %d6,%a5@(2652)
    215c2:	486d 0854      	pea %a5@(2132)
-   215c6:	4eb9 0002 0ff8 	jsr 0x20ff8
+   215c6:	4eb9 0002 0ff8 	jsr 0x20ff8		; diskio
    215cc:	588f           	addql #4,%sp
    215ce:	2f3c 0000 0200 	movel #0x200,%sp@-
    215d4:	486d 0248      	pea %a5@(584)
@@ -1848,7 +1894,7 @@
    215f8:	d1c0           	addal %d0,%a0
    215fa:	2b50 0a5c      	movel %a0@,%a5@(2652)
    215fe:	486d 0854      	pea %a5@(2132)
-   21602:	4eb9 0002 0ff8 	jsr 0x20ff8
+   21602:	4eb9 0002 0ff8 	jsr 0x20ff8		; diskio
    21608:	588f           	addql #4,%sp
    2160a:	2f3c 0000 0200 	movel #0x200,%sp@-
    21610:	486d 0004      	pea %a5@(4)
@@ -1878,7 +1924,7 @@
    21662:	672c           	beqs 0x21690
    21664:	2b46 0a5c      	movel %d6,%a5@(2652)
    21668:	486d 0854      	pea %a5@(2132)
-   2166c:	4eb9 0002 0ff8 	jsr 0x20ff8
+   2166c:	4eb9 0002 0ff8 	jsr 0x20ff8		; diskio
    21672:	588f           	addql #4,%sp
    21674:	2f3c 0000 0200 	movel #0x200,%sp@-
    2167a:	486d 044c      	pea %a5@(1100)
@@ -1890,7 +1936,7 @@
    21696:	2007           	movel %d7,%d0
    21698:	0480 0000 008a 	subil #0x8a,%d0
    2169e:	2f00           	movel %d0,%sp@-
-   216a0:	4eb9 0002 2b84 	jsr 0x22b84
+   216a0:	4eb9 0002 2b84 	jsr 0x22b84		; math
    216a6:	508f           	addql #8,%sp
    216a8:	2d40 fffc      	movel %d0,%fp@(-4)
    216ac:	41ed 044c      	lea %a5@(1100),%a0
@@ -1902,7 +1948,7 @@
    216be:	672c           	beqs 0x216ec
    216c0:	2b46 0a5c      	movel %d6,%a5@(2652)
    216c4:	486d 0854      	pea %a5@(2132)
-   216c8:	4eb9 0002 0ff8 	jsr 0x20ff8
+   216c8:	4eb9 0002 0ff8 	jsr 0x20ff8		; diskio
    216ce:	588f           	addql #4,%sp
    216d0:	2f3c 0000 0200 	movel #0x200,%sp@-
    216d6:	486d 0248      	pea %a5@(584)
@@ -1914,7 +1960,7 @@
    216f2:	2007           	movel %d7,%d0
    216f4:	0480 0000 008a 	subil #0x8a,%d0
    216fa:	2f00           	movel %d0,%sp@-
-   216fc:	4eb9 0002 2c4c 	jsr 0x22c4c
+   216fc:	4eb9 0002 2c4c 	jsr 0x22c4c		; math_y
    21702:	508f           	addql #8,%sp
    21704:	2d40 fffc      	movel %d0,%fp@(-4)
    21708:	41ed 0248      	lea %a5@(584),%a0
@@ -1930,6 +1976,7 @@
    21730:	4e75           	rts
    21732:	0000
 
+; ========================================================
 ; subroutine - send a character. "putc"
 ; it seems crazy, but this seems to initialize the uart and timer
 ; for each and every character.
@@ -1969,12 +2016,14 @@
    2178e:	4e5e           	unlk %fp
    21790:	4e75           	rts
 
+; ==========================================================
 ; subroutine to read character "getc"
 
    21792:	4e56 fff4      	linkw %fp,#-12
    21796:	4a2f ff7c      	tstb %sp@(-132)
    2179a:	48ee 20c0 fff4 	moveml %d6-%d7/%a5,%fp@(-12)
-   217a0:	2e2e 0008      	movel %fp@(8),%d7
+
+   217a0:	2e2e 0008      	movel %fp@(8),%d7	; argument !
 
    217a4:	4eb9 0002 17de 	jsr 0x217de		; uart init
    217aa:	2a7c 0060 0000 	moveal #0x600000,%a5	; uart base
@@ -1990,6 +2039,7 @@
    217c0:	6012           	bras 0x217d4
 
    217c2:	1c15           	moveb %a5@,%d6		; read character
+
    217c4:	0286 0000 007f 	andil #0x7f,%d6
    217ca:	0c46 000d      	cmpiw #0xd,%d6		; CR
    217ce:	6602           	bnes 0x217d2
@@ -2000,6 +2050,7 @@
    217da:	4e5e           	unlk %fp
    217dc:	4e75           	rts
 
+; ===========================================================
 ; subroutine to initialize uart
 
    217de:	4e56 fff8      	linkw %fp,#-8
@@ -2258,35 +2309,56 @@
 
 ; =======================================================
 
+; subroutine get_user ( a, b, n )
+
+; this has the only call to getc() inside.
+
    21a34:	4e56 ffe8      	linkw %fp,#-24
    21a38:	4a2f ff7c      	tstb %sp@(-132)
    21a3c:	48ee 30f0 ffe8 	moveml %d4-%d7/%a4-%a5,%fp@(-24)
+
    21a42:	2a6e 0008      	moveal %fp@(8),%a5
    21a46:	286e 000c      	moveal %fp@(12),%a4
-   21a4a:	2e2e 0010      	movel %fp@(16),%d7
+   21a4a:	2e2e 0010      	movel %fp@(16),%d7	; n
+
    21a4e:	7c00           	moveq #0,%d6
    21a50:	2807           	movel %d7,%d4
+
+; Here is the format, note the %2d embedded within it.
+;  23160 ---- 1b37 1b5b 313b 3738 481b 5b37 6d25      7 [1;78H [7m%
+;  23170 3264 1b38 00                                 2d
 
    21a52:	2f04           	movel %d4,%sp@-
    21a54:	2f3c 0002 3162 	movel #0x23162,%sp@-
    21a5a:	4eb9 0002 193e 	jsr 0x2193e		; printf
    21a60:	508f           	addql #8,%sp
 
+; loop at very end
+; Call getc with timeout
    21a62:	2f3c 0002 625a 	movel #0x2625a,%sp@-
-   21a68:	4eb9 0002 1792 	jsr 0x21792		; getc
+   21a68:	4eb9 0002 1792 	jsr 0x21792		; getc ( 156250 )
    21a6e:	588f           	addql #4,%sp
+
    21a70:	2a00           	movel %d0,%d5
-   21a72:	0c80 0000 000a 	cmpil #0xa,%d0
+   21a72:	0c80 0000 000a 	cmpil #0xa,%d0		; newline 
    21a78:	6756           	beqs 0x21ad0
-   21a7a:	0c85 ffff fffe 	cmpil #-2,%d5
+
+   21a7a:	0c85 ffff fffe 	cmpil #-2,%d5		; timeout
    21a80:	6670           	bnes 0x21af2
-   21a82:	0c87 ffff ffff 	cmpil #-1,%d7
+
+   21a82:	0c87 ffff ffff 	cmpil #-1,%d7		; never happens
    21a88:	6712           	beqs 0x21a9c
+
+; another printf format with %2d embedded
+;  23170 ------------1b 371b 5b31 3b37 3848 1b5b   2d 8  7 [1;78H [
+;  23180 376d 2532 641b 3800 ---- ---- ---- ----   7m%2d 8
+
    21a8a:	5384           	subql #1,%d4
    21a8c:	2f04           	movel %d4,%sp@-
    21a8e:	2f3c 0002 3175 	movel #0x23175,%sp@-
    21a94:	4eb9 0002 193e 	jsr 0x2193e		; printf
    21a9a:	508f           	addql #8,%sp
+
    21a9c:	4a84           	tstl %d4
    21a9e:	6cc2           	bges 0x21a62
    21aa0:	0c87 ffff ffff 	cmpil #-1,%d7
@@ -2306,17 +2378,21 @@
    21ac6:	4eb9 0002 186a 	jsr 0x2186a		; puts
    21acc:	588f           	addql #4,%sp
    21ace:	7a0a           	moveq #10,%d5
+
    21ad0:	2f05           	movel %d5,%sp@-
    21ad2:	4eb9 0002 1734 	jsr 0x21734		; putc
    21ad8:	588f           	addql #4,%sp
+
    21ada:	200d           	movel %a5,%d0
    21adc:	d086           	addl %d6,%d0
    21ade:	2040           	moveal %d0,%a0
    21ae0:	4210           	clrb %a0@
+
    21ae2:	2f3c 0002 318e 	movel #0x2318e,%sp@-
    21ae8:	4eb9 0002 193e 	jsr 0x2193e		; printf
    21aee:	588f           	addql #4,%sp
    21af0:	6062           	bras 0x21b54
+
    21af2:	0c85 0000 0008 	cmpil #8,%d5
    21af8:	6638           	bnes 0x21b32
    21afa:	4a86           	tstl %d6
@@ -2345,6 +2421,7 @@
    21b4c:	5286           	addql #1,%d6
    21b4e:	7eff           	moveq #-1,%d7
    21b50:	6000 ff10      	braw 0x21a62
+
    21b54:	4cee 30f0 ffe8 	moveml %fp@(-24),%d4-%d7/%a4-%a5
    21b5a:	4e5e           	unlk %fp
    21b5c:	4e75           	rts
@@ -2660,6 +2737,9 @@
    21f8a:	2a5f           	moveal %sp@+,%a5
    21f8c:	4e5e           	unlk %fp
    21f8e:	4e75           	rts
+
+; subroutine, one call during startup
+
    21f90:	4e56 ff08      	linkw %fp,#-248
    21f94:	4a2f ff7c      	tstb %sp@(-132)
    21f98:	2f07           	movel %d7,%sp@-
@@ -2940,6 +3020,12 @@
    22412:	2e1f           	movel %sp@+,%d7
    22414:	4e5e           	unlk %fp
    22416:	4e75           	rts
+
+;  239a0 ---- ---- ---- ---- ---- 626f 6f74 3a20             boot: 
+;  239b0 00
+
+; subroutine - send "boot: " prompt  PROMPT
+
    22418:	4e56 0000      	linkw %fp,#0
    2241c:	4a2f ff7c      	tstb %sp@(-132)
    22420:	2f3c 0002 39aa 	movel #0x239aa,%sp@-
@@ -2949,9 +3035,10 @@
    22430:	4e75           	rts
 
 ; ==================================
-; subroutine ( n, xx )  "intro"
+; subroutine ( n, msg_list )  "intro"  INTRO
 ;
 ; n is count of leading spaces
+; second argument is a list of strings for printf
 
 ; The first call has "xx" set to 232e8 ---
 ;
@@ -2959,6 +3046,111 @@
 ;  232f0 0002 33b4 0002 33c9 0002 33cd 0002 3418     3   3   3   4 
 ;  23300 0000 0000
 
+;  23350 ---- ---- ---- ---- ---- ---- 1b5b 324a     7   7      [2J
+;  23360 1b5b 481b 2842 1b5b 376d 00-- ---- ----    [H (B [7m
+
+;  23360 ---- ---- ---- ---- -------42 4f4f 543a              BOOT:
+;  23370 2043 616c 6c61 6e20 4461 7461 2053 7973    Callan Data Sys
+;  23380 7465 6d73 2055 4e49 5354 4152 2055 4e49   tems UNISTAR UNI
+;  23390 5820 626f 6f74 2070 726f 6772 616d 2028   X boot program (
+;  233a0 7265 6c65 6173 6520 332e 302c 2032 314d   release 3.0, 21M
+;  233b0 4229 3a00 ---- ---- ---- ---- ---- ----   B):             
+
+;  233b0           2020 2020 2020 2020 2020 2020                   
+;  233c0 2020 2020 2020 200a 00
+
+;  233c0 ---- ---- ---- ---- --1b 5b6d 00
+
+;  233c0 ---- ---- ---- ---- ---- ---- --42 4f4f                BOO
+;  233d0 543a 2050 7265 7373 2052 4554 5552 4e20   T: Press RETURN 
+;  233e0 746f 206c 6f61 6420 554e 4958 2c20 6f72   to load UNIX, or
+;  233f0 2074 7970 6520 6120 3f20 666f 6c6c 6f77    type a ? follow
+;  23400 6564 2062 7920 5245 5455 524e 2066 6f72   ed by RETURN for
+;  23410 2068 656c 702e 0a00 ---- ---- ---- ----    help.
+
+;  23410 ---- ---- ---- ---- 0a62 6f6f 743a 2000            boot:  
+
+; The second call looks like this;
+;   226b6:	2f3c 0002 3304 	movel #0x23304,%sp@-
+;   226bc:	2f3c 0000 0006 	movel #6,%sp@-
+;   226c2:	4eb9 0002 2432 	jsr 0x22432		; intro ( 6, y )
+;   226c8:	508f           	addql #8,%sp
+
+;  23300 ---- ---- 0002 3420 0002 3447 0002 3482         4   4G  4 
+;  23310 0002 34b9 0002 34f1 0002 3525 0002 355d     4   4   5%  5]
+;  23320 0002 3599 0002 35ca 0002 35cc 0002 3604     5   5   5   6 
+;  23330 0002 3640 0002 3675 0002 36a0 0002 36c9     6@  6u  6   6 
+;  23340 0002 3701 0002 3739 0002 3767 0002 3790     7   79  7g  7 
+;  23350 0002 37c8 0002 37ef 0000 0000
+
+
+;  23420 5468 6520 666f 6c6c 6f77 696e 6720 636f   The following co
+;  23430 6d6d 616e 6473 2061 7265 2061 7661 696c   mmands are avail
+;  23440 6162 6c65 3a0a 0020 2020 5245 5455 524e   able:     RETURN
+;  23450 2020 2042 6f6f 7473 2060 756e 6978 2720      Boots `unix' 
+;  23460 6672 6f6d 2074 6865 2043 616c 6c61 6e20   from the Callan 
+;  23470 5769 6e63 6865 7374 6572 2064 6973 6b2e   Winchester disk.
+;  23480 0a00 2020 2066 2020 2020 2020 2020 426f        f        Bo
+;  23490 6f74 7320 6075 6e69 7827 2066 726f 6d20   ots `unix' from 
+;  234a0 7468 6520 4361 6c6c 616e 2066 6c6f 7070   the Callan flopp
+;  234b0 7920 6469 736b 2e0a 0020 2020 6d73 6320   y disk.     msc 
+;  234c0 2020 2020 2042 6f6f 7473 2060 756e 6978        Boots `unix
+;  234d0 2720 6672 6f6d 2074 6865 204d 5343 2d39   ' from the MSC-9
+;  234e0 3230 3520 5769 6e63 6865 7374 6572 2e0a   205 Winchester. 
+;  234f0 0020 2020 6220 2020 2020 2020 2042 6f6f       b        Boo
+;  23500 7473 2066 696c 6573 2075 7369 6e67 2073   ts files using s
+;  23510 7570 706c 6965 6420 7061 7261 6d65 7465   upplied paramete
+;  23520 7273 2e0a 0020 2020 7375 6d20 2020 2020   rs.     sum     
+;  23530 2043 6865 636b 7375 6d73 2066 696c 6573    Checksums files
+;  23540 2075 7369 6e67 2073 7570 706c 6965 6420    using supplied 
+;  23550 7061 7261 6d65 7465 7273 2e0a 0020 2020   parameters.     
+;  23560 7368 6970 2020 2020 204d 6f76 6573 2068   ship     Moves h
+;  23570 6172 6420 6469 736b 2061 726d 2074 6f20   ard disk arm to 
+;  23580 706f 7765 722d 6f66 6620 6c61 6e64 696e   power-off landin
+;  23590 6720 6172 6561 2e0a 0020 2020 7368 6970   g area.     ship
+;  235a0 7320 2020 204c 696b 6520 7368 6970 2c20   s    Like ship, 
+;  235b0 6275 7420 666f 7220 6d75 6c74 6970 6c65   but for multiple
+;  235c0 2064 7269 7665 732e 0a00 0a00 2020 2020    drives.        
+;  235d0 2020 2020 2020 2020 5355 5050 4c49 4544           SUPPLIED
+;  235e0 2050 4152 414d 4554 4552 5320 4152 4520    PARAMETERS ARE 
+;  235f0 4f46 2054 4845 2046 4f52 4d41 5420 2e2e   OF THE FORMAT ..
+;  23600 2e2e 0a00 2020 2020 2020 2020 2020 2020   ..              
+;  23610 636d 6420 2064 7269 7665 726e 6d28 6472   cmd  drivernm(dr
+;  23620 6976 655f 6172 6773 2c66 696c 6573 7973   ive_args,filesys
+;  23630 5f61 7267 7329 6669 6c65 6e61 6d65 0a00   _args)filename  
+;  23640 2020 2020 2020 2020 2020 2020 5748 4552               WHER
+;  23650 4520 4452 4956 455f 4152 4753 2041 5245   E DRIVE_ARGS ARE
+;  23660 204f 4620 5448 4520 464f 524d 4154 202e    OF THE FORMAT .
+;  23670 2e2e 2e0a 0020 2020 2020 2020 2020 2020   ...             
+;  23680 2020 2020 2020 2020 2020 2020 2020 2020                   
+;  23690 2020 6472 6976 655f 6e75 6d62 6572 0a00     drive_number  
+;  236a0 2020 2020 2020 2020 2020 2020 2020 2020                   
+;  236b0 2020 2020 2020 2020 2020 2020 2020 2020                   
+;  236c0 202d 204f 5220 2d0a 0020 2020 2020 2020    - OR -         
+;  236d0 2020 2020 2020 205b 6472 6976 656e 6f2c          [driveno,
+;  236e0 6e62 7074 2c6e 7470 632c 6e63 7064 2c64   nbpt,ntpc,ncpd,d
+;  236f0 7031 2c64 7032 2c64 7033 2c64 7034 5d0a   p1,dp2,dp3,dp4] 
+;  23700 0020 2020 2020 2020 2020 2020 2057 4845                WHE
+;  23710 5245 2046 494c 4553 5953 5f41 5247 5320   RE FILESYS_ARGS 
+;  23720 4152 4520 4f46 2054 4845 2046 4f52 4d41   ARE OF THE FORMA
+;  23730 5420 2e2e 2e2e 200a 0020 2020 2020 2020   T ....          
+;  23740 2020 2020 2020 2020 2020 2020 2020 2020                   
+;  23750 2020 2020 6669 6c65 7379 7374 656d 5f6e       filesystem_n
+;  23760 756d 6265 720a 0020 2020 2020 2020 2020   umber           
+;  23770 2020 2020 2020 2020 2020 2020 2020 2020                   
+;  23780 2020 2020 2020 2020 2d20 4f52 202d 0a00           - OR -  
+;  23790 2020 2020 2020 2020 2020 2020 2020 205b                  [
+;  237a0 6669 6c65 7379 735f 7374 6172 745f 626c   filesys_start_bl
+;  237b0 6f63 6b2c 6669 6c65 7379 735f 656e 645f   ock,filesys_end_
+;  237c0 626c 6f63 6b5d 0a00 2020 2020 2020 2020   block]          
+;  237d0 2020 2020 2020 2020 2020 2020 2020 2020                   
+;  237e0 2020 2020 2020 4558 414d 504c 450a 0020         EXAMPLE   
+;  237f0 2020 2020 2020 2020 2020 2062 206d 7363              b msc
+;  23800 285b 302c 3136 2c34 2c33 3036 2c34 2c30   ([0,16,4,306,4,0
+;  23810 2c30 2c30 5d2c 5b30 2c36 3436 335d 2975   ,0,0],[0,6463])u
+;  23820 6e69 780a 00
+
+; intro - here is the code.
    22432:	4e56 fff0      	linkw %fp,#-16
    22436:	4a2f ff7c      	tstb %sp@(-132)
    2243a:	48ee 20e0 fff0 	moveml %d5-%d7/%a5,%fp@(-16)
@@ -3002,6 +3194,8 @@
    22486:	4cee 20e0 fff0 	moveml %fp@(-16),%d5-%d7/%a5
    2248c:	4e5e           	unlk %fp
    2248e:	4e75           	rts
+
+; =========================================
 
    22490:	4e56 ffdc      	linkw %fp,#-36
    22494:	4a2f ff7c      	tstb %sp@(-132)
@@ -3136,16 +3330,7 @@
    2264a:	4eb9 0002 01b0 	jsr 0x201b0		; move ( 0x23a3c >> 0x23280 )
    22650:	508f           	addql #8,%sp
 
-;  232e0 0000 0000 0000 0000 0002 335c 0002 336b             3\  3k
-;  232f0 0002 33b4 0002 33c9 0002 33cd 0002 3418     3   3   3   4 
-;  23300 0000 0000 0002 3420 0002 3447 0002 3482         4   4G  4 
-;  23310 0002 34b9 0002 34f1 0002 3525 0002 355d     4   4   5%  5]
-;  23320 0002 3599 0002 35ca 0002 35cc 0002 3604     5   5   5   6 
-;  23330 0002 3640 0002 3675 0002 36a0 0002 36c9     6@  6u  6   6 
-;  23340 0002 3701 0002 3739 0002 3767 0002 3790     7   79  7g  7 
-;  23350 0002 37c8 0002 37ef 0000 0000 1b5b 324a     7   7      [2J
-;  23360 1b5b 481b 2842 1b5b 376d 0042 4f4f 543a    [H (B [7m BOOT:
-;  23370 2043 616c 6c61 6e20 4461 7461 2053 7973    Callan Data Sys
+; first big greeting menu
 
    22652:	2f3c 0002 32e8 	movel #0x232e8,%sp@-
    22658:	42a7           	clrl %sp@-
@@ -3155,13 +3340,15 @@
    22662:	2f3c 0000 001e 	movel #0x1e,%sp@-
    22668:	2f3c 0002 3a41 	movel #0x23a41,%sp@-
    2266e:	2f3c 0002 31a4 	movel #0x231a4,%sp@-
-   22674:	4eb9 0002 1a34 	jsr 0x21a34
+   22674:	4eb9 0002 1a34 	jsr 0x21a34		; get_user ()
    2267a:	defc 000c      	addaw #0xc,%sp
+
    2267e:	42b9 0002 322c 	clrl 0x2322c
 
    22684:	2f3c 0002 31a4 	movel #0x231a4,%sp@-
    2268a:	4eb9 0002 0164 	jsr 0x20164		; count_nz ( a4 )
    22690:	588f           	addql #4,%sp
+
    22692:	23c0 0002 3228 	movel %d0,0x23228
    22698:	4eb9 0002 1f90 	jsr 0x21f90
 
@@ -3173,6 +3360,8 @@
    226b2:	4a80           	tstl %d0
    226b4:	6734           	beqs 0x226ea
 
+; second big greeting menu
+
    226b6:	2f3c 0002 3304 	movel #0x23304,%sp@-
    226bc:	2f3c 0000 0006 	movel #6,%sp@-
    226c2:	4eb9 0002 2432 	jsr 0x22432		; intro ( 6, y )
@@ -3181,7 +3370,7 @@
    226ca:	2f3c 0000 001e 	movel #0x1e,%sp@-
    226d0:	2f3c 0002 3a44 	movel #0x23a44,%sp@-
    226d6:	2f3c 0002 31a4 	movel #0x231a4,%sp@-
-   226dc:	4eb9 0002 1a34 	jsr 0x21a34
+   226dc:	4eb9 0002 1a34 	jsr 0x21a34		; get_user ()
    226e2:	defc 000c      	addaw #0xc,%sp
    226e6:	6000 fedc      	braw 0x225c4
 
@@ -3238,79 +3427,80 @@
 
    227c0:	4a80           	tstl %d0
    227c2:	6700 01aa      	beqw 0x2296e
-   227c6:	4eb9 0002 2418 	jsr 0x22418
+
+   227c6:	4eb9 0002 2418 	jsr 0x22418		; prompt
    227cc:	2f3c 0002 3230 	movel #0x23230,%sp@-
    227d2:	2f3c 0002 3a4b 	movel #0x23a4b,%sp@-
    227d8:	4eb9 0002 193e 	jsr 0x2193e		; printf
    227de:	508f           	addql #8,%sp
-   227e0:	4eb9 0002 2418 	jsr 0x22418
+   227e0:	4eb9 0002 2418 	jsr 0x22418		; prompt
    227e6:	2f39 0002 3258 	movel 0x23258,%sp@-
    227ec:	2f3c 0002 3a73 	movel #0x23a73,%sp@-
    227f2:	4eb9 0002 193e 	jsr 0x2193e		; printf
    227f8:	508f           	addql #8,%sp
-   227fa:	4eb9 0002 2418 	jsr 0x22418
+   227fa:	4eb9 0002 2418 	jsr 0x22418		; prompt
    22800:	2f39 0002 325c 	movel 0x2325c,%sp@-
    22806:	2f3c 0002 3a99 	movel #0x23a99,%sp@-
    2280c:	4eb9 0002 193e 	jsr 0x2193e		; printf
    22812:	508f           	addql #8,%sp
-   22814:	4eb9 0002 2418 	jsr 0x22418
+   22814:	4eb9 0002 2418 	jsr 0x22418		; prompt
    2281a:	2f39 0002 3260 	movel 0x23260,%sp@-
    22820:	2f3c 0002 3abf 	movel #0x23abf,%sp@-
    22826:	4eb9 0002 193e 	jsr 0x2193e		; printf
    2282c:	508f           	addql #8,%sp
-   2282e:	4eb9 0002 2418 	jsr 0x22418
+   2282e:	4eb9 0002 2418 	jsr 0x22418		; prompt
    22834:	2f39 0002 3264 	movel 0x23264,%sp@-
    2283a:	2f3c 0002 3ae5 	movel #0x23ae5,%sp@-
    22840:	4eb9 0002 193e 	jsr 0x2193e		; printf
    22846:	508f           	addql #8,%sp
-   22848:	4eb9 0002 2418 	jsr 0x22418
+   22848:	4eb9 0002 2418 	jsr 0x22418		; prompt
    2284e:	2f39 0002 3268 	movel 0x23268,%sp@-
    22854:	2f3c 0002 3b0b 	movel #0x23b0b,%sp@-
    2285a:	4eb9 0002 193e 	jsr 0x2193e		; printf
    22860:	508f           	addql #8,%sp
-   22862:	4eb9 0002 2418 	jsr 0x22418
+   22862:	4eb9 0002 2418 	jsr 0x22418		; prompt
    22868:	2f39 0002 326c 	movel 0x2326c,%sp@-
    2286e:	2f3c 0002 3b31 	movel #0x23b31,%sp@-
    22874:	4eb9 0002 193e 	jsr 0x2193e		; printf
    2287a:	508f           	addql #8,%sp
-   2287c:	4eb9 0002 2418 	jsr 0x22418
+   2287c:	4eb9 0002 2418 	jsr 0x22418		; prompt
    22882:	2f39 0002 3270 	movel 0x23270,%sp@-
    22888:	2f3c 0002 3b57 	movel #0x23b57,%sp@-
    2288e:	4eb9 0002 193e 	jsr 0x2193e		; printf
    22894:	508f           	addql #8,%sp
-   22896:	4eb9 0002 2418 	jsr 0x22418
+   22896:	4eb9 0002 2418 	jsr 0x22418		; prompt
    2289c:	2f39 0002 3274 	movel 0x23274,%sp@-
    228a2:	2f3c 0002 3b7d 	movel #0x23b7d,%sp@-
    228a8:	4eb9 0002 193e 	jsr 0x2193e		; printf
    228ae:	508f           	addql #8,%sp
-   228b0:	4eb9 0002 2418 	jsr 0x22418
+   228b0:	4eb9 0002 2418 	jsr 0x22418		; prompt
    228b6:	2f39 0002 3240 	movel 0x23240,%sp@-
    228bc:	2f3c 0002 3ba3 	movel #0x23ba3,%sp@-
    228c2:	4eb9 0002 193e 	jsr 0x2193e		; printf
    228c8:	508f           	addql #8,%sp
-   228ca:	4eb9 0002 2418 	jsr 0x22418
+   228ca:	4eb9 0002 2418 	jsr 0x22418		; prompt
    228d0:	2f39 0002 3278 	movel 0x23278,%sp@-
    228d6:	2f3c 0002 3bc9 	movel #0x23bc9,%sp@-
    228dc:	4eb9 0002 193e 	jsr 0x2193e		; printf
    228e2:	508f           	addql #8,%sp
-   228e4:	4eb9 0002 2418 	jsr 0x22418
+   228e4:	4eb9 0002 2418 	jsr 0x22418		; prompt
    228ea:	2f39 0002 327c 	movel 0x2327c,%sp@-
    228f0:	2f3c 0002 3bef 	movel #0x23bef,%sp@-
    228f6:	4eb9 0002 193e 	jsr 0x2193e		; printf
    228fc:	508f           	addql #8,%sp
-   228fe:	4eb9 0002 2418 	jsr 0x22418
+   228fe:	4eb9 0002 2418 	jsr 0x22418		; prompt
    22904:	2f3c 0002 3280 	movel #0x23280,%sp@-
    2290a:	2f3c 0002 3c15 	movel #0x23c15,%sp@-
    22910:	4eb9 0002 193e 	jsr 0x2193e		; printf
    22916:	508f           	addql #8,%sp
-   22918:	4eb9 0002 2418 	jsr 0x22418
+   22918:	4eb9 0002 2418 	jsr 0x22418		; prompt
    2291e:	2f3c 0002 3c3d 	movel #0x23c3d,%sp@-
    22924:	4eb9 0002 193e 	jsr 0x2193e		; printf
    2292a:	588f           	addql #4,%sp
    2292c:	2f3c ffff ffff 	movel #-1,%sp@-
    22932:	2f3c 0002 3c51 	movel #0x23c51,%sp@-
    22938:	2f3c 0002 31a4 	movel #0x231a4,%sp@-
-   2293e:	4eb9 0002 1a34 	jsr 0x21a34
+   2293e:	4eb9 0002 1a34 	jsr 0x21a34		; get_user ()
    22944:	defc 000c      	addaw #0xc,%sp
    22948:	0c39 0079 0002 	cmpib #0x79,0x231a4
    2294e:	31a4
@@ -3370,7 +3560,7 @@
    22a1c:	2f3c 0000 000a 	movel #0xa,%sp@-
    22a22:	2f3c 0002 3cdc 	movel #0x23cdc,%sp@-
    22a28:	2f3c 0002 31a4 	movel #0x231a4,%sp@-
-   22a2e:	4eb9 0002 1a34 	jsr 0x21a34
+   22a2e:	4eb9 0002 1a34 	jsr 0x21a34		; get_user ()
    22a34:	defc 000c      	addaw #0xc,%sp
    22a38:	4a39 0002 31a4 	tstb 0x231a4
    22a3e:	6700 fb84      	beqw 0x225c4
@@ -3383,17 +3573,19 @@
    22a5e:	4eb9 0002 1bf8 	jsr 0x21bf8
    22a64:	588f           	addql #4,%sp
    22a66:	23c0 0002 3264 	movel %d0,0x23264
+
    22a6c:	2f00           	movel %d0,%sp@-
    22a6e:	2f39 0002 3258 	movel 0x23258,%sp@-
    22a74:	4eb9 0002 0d64 	jsr 0x20d64		; hd_x()
    22a7a:	508f           	addql #8,%sp
+
    22a7c:	2f3c 0002 3c83 	movel #0x23c83,%sp@-
    22a82:	4eb9 0002 193e 	jsr 0x2193e		; printf
    22a88:	588f           	addql #4,%sp
    22a8a:	2f3c 0000 000a 	movel #0xa,%sp@-
    22a90:	2f3c 0002 3caf 	movel #0x23caf,%sp@-
    22a96:	2f3c 0002 31a4 	movel #0x231a4,%sp@-
-   22a9c:	4eb9 0002 1a34 	jsr 0x21a34
+   22a9c:	4eb9 0002 1a34 	jsr 0x21a34		; get_user ()
    22aa2:	defc 000c      	addaw #0xc,%sp
    22aa6:	4a39 0002 31a4 	tstb 0x231a4
    22aac:	6600 ff36      	bnew 0x229e4
@@ -3463,6 +3655,7 @@
    22b7e:	202f 000c      	movel %sp@(12),%d0
    22b82:	4e75           	rts
 
+; does math for disk IO routines
    22b84:	4e56 0000      	linkw %fp,#0
    22b88:	48e7 3c00      	moveml %d2-%d5,%sp@-
    22b8c:	2a3c 0000 0001 	movel #1,%d5
@@ -3511,8 +3704,11 @@
    22c02:	4cdf 003c      	moveml %sp@+,%d2-%d5
    22c06:	4e5e           	unlk %fp
    22c08:	4e75           	rts
-   22c0a:	0000 48e7      	orib #0xffe7,%d0
-   22c0e:	3800           	movew %d0,%d4
+   22c0a:	0000
+
+; math_x
+
+   22c0c:	48e7 3800	---
    22c10:	242f 0010      	movel %sp@(16),%d2
    22c14:	2802           	movel %d2,%d4
    22c16:	6c00 0004      	bgew 0x22c1c
@@ -3537,6 +3733,9 @@
    22c44:	4480           	negl %d0
    22c46:	4cdf 001c      	moveml %sp@+,%d2-%d4
    22c4a:	4e75           	rts
+
+; math_y
+
    22c4c:	4e56 0000      	linkw %fp,#0
    22c50:	48e7 3800      	moveml %d2-%d4,%sp@-
    22c54:	283c 0000 0001 	movel #1,%d4
