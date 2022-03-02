@@ -17,6 +17,12 @@
 ; Based on the menus in this ROM, the unknown device is probably
 ; the "MSC-9205" winchester
 
+; WARNING !! If you are looking at the manual for the CWC be
+; aware that little/big endian business affects byte order.
+; This works out nicely for 16 and 32 bit values sent to
+; the hardware, but pairs of byte items get swapped.
+; This even affects the register addresses!!
+
 ; RAM
 ; 00000 - 3ffff is on board ram
 ; 40000 - xffff is multibus ram (as mapped by this ROM)
@@ -234,6 +240,7 @@
 ; subroutine strcmp ( a, b )
 ; compare two null terminated strings
 ; string "a" governs the termination
+; return 0 if not equal, 1 if they match
 
    20184:	4e56 fff4      	linkw %fp,#-12
    20188:	48ee 3080 fff4 	moveml %d7/%a4-%a5,%fp@(-12)
@@ -900,28 +907,45 @@
    20a10:	4e75           	rts
    20a12:	0000
 
-; subroutine
+; subroutine - report on a hd error
+; hd_error (stb)
+; arg gives pointer to CWC status block
+
    20a14:	4e56 fffc	linkw %fp,#-4
    20a18:	4a2f ff7c      	tstb %sp@(-132)
    20a1c:	2f0d           	movel %a5,%sp@-
 
-   20a1e:	2a6e 0008      	moveal %fp@(8),%a5
-   20a22:	2f2d 0008      	movel %a5@(8),%sp@-
+   20a1e:	2a6e 0008      	moveal %fp@(8),%a5	; stb
+
+   20a22:	2f2d 0008      	movel %a5@(8),%sp@-	; byte count
+
    20a26:	7000           	moveq #0,%d0
    20a28:	102d 0005      	moveb %a5@(5),%d0
-   20a2c:	2f00           	movel %d0,%sp@-
+   20a2c:	2f00           	movel %d0,%sp@-		; sector
+
    20a2e:	7000           	moveq #0,%d0
    20a30:	102d 0004      	moveb %a5@(4),%d0
-   20a34:	2f00           	movel %d0,%sp@-
+   20a34:	2f00           	movel %d0,%sp@-		; head
+
    20a36:	7000           	moveq #0,%d0
    20a38:	302d 0006      	movew %a5@(6),%d0
-   20a3c:	2f00           	movel %d0,%sp@-
+   20a3c:	2f00           	movel %d0,%sp@-		; cyl
+
    20a3e:	7000           	moveq #0,%d0
    20a40:	102d 0002      	moveb %a5@(2),%d0
-   20a44:	2f00           	movel %d0,%sp@-
+   20a44:	2f00           	movel %d0,%sp@-		; unit **
+
    20a46:	7000           	moveq #0,%d0
-   20a48:	102d 0001      	moveb %a5@(1),%d0
+   20a48:	102d 0001      	moveb %a5@(1),%d0	; status **
    20a4c:	2f00           	movel %d0,%sp@-
+
+;  22fb0 ---- ---- ---- 0a63 7763 3a20 6572 726f          cwc: erro
+;  22fc0 7220 3078 2578 206f 6e20 6472 3a25 6420   r 0x%x on dr:%d 
+;  22fd0 6379 6c3a 2564 2074 726b 3a25 6420 7365   cyl:%d trk:%d se
+;  22fe0 633a 2564 2078 6672 3a25 640a 00-- ----   c:%d xfr:%d
+
+;  22fb6 "cwc: error 0x%x on dr:%d cyl:%d trk:%d sec:%d xfr:%d\n"
+
    20a4e:	2f3c 0002 2fb6 	movel #0x22fb6,%sp@-
    20a54:	4eb9 0002 193e 	jsr 0x2193e		; printf
    20a5a:	defc 001c      	addaw #0x1c,%sp
@@ -948,7 +972,13 @@
 ; 6 words of 4 bytes each, just enough space for the stuff
 ; dumped by the moveml that follows
 
+; ====================================
 ; subroutine "hd_wait"
+
+; ** note: we read the CWC status register at offset 1.
+; (the manual says 0), this is because of byte order,
+; and the offset of 1 is correct for the m68k
+
    20a64:	4e56 ffe8      	linkw %fp,#-24
    20a68:	4a2f ff7c      	tstb %sp@(-132)
    20a6c:	48ee 38e0 ffe8 	moveml %d5-%d7/%a3-%a5,%fp@(-24)
@@ -960,7 +990,7 @@
    20a7a:	2c3c 0007 a120 	movel #0x7a120,%d6	; d6 = 500,000
    20a80:	600a           	bras 0x20a8c
 
-   20a82:	082d 0007 0001 	btst #7,%a5@(1)		; test busy
+   20a82:	082d 0007 0001 	btst #7,%a5@(1)		; test busy **
    20a88:	6706           	beqs 0x20a90
    20a8a:	5287           	addql #1,%d7		; d7++
    20a8c:	be86           	cmpl %d6,%d7
@@ -980,27 +1010,32 @@
    20aa4:	4aae 0008      	tstl %fp@(8)		; check flag
    20aa8:	673e           	beqs 0x20ae8		; return if 0
 
-   20aaa:	287c 0004 0800 	moveal #0x40800,%a4	; in ROM
-   20ab0:	267c 0004 0900 	moveal #0x40900,%a3	; in ROM
+   20aaa:	287c 0004 0800 	moveal #0x40800,%a4	; CPB (never used)
+   20ab0:	267c 0004 0900 	moveal #0x40900,%a3	; status block
 
-   20ab6:	1b79 0002 2fb0 	moveb 0x22fb0,%a5@(6)
+; any write will do to reset the interrupt
+   20ab6:	1b79 0002 2fb0 	moveb 0x22fb0,%a5@(6)	; reset interrupt **
    20abc:	0006
-   20abe:	1a2b 0001      	moveb %a3@(1),%d5
+
+; byte order causes status to be at 1
+   20abe:	1a2b 0001      	moveb %a3@(1),%d5	; status **
    20ac2:	0285 0000 00f0 	andil #0xf0,%d5
-   20ac8:	0c05 0080      	cmpib #0xff80,%d5
+
+   20ac8:	0c05 0080      	cmpib #0x80,%d5		; no error
    20acc:	671a           	beqs 0x20ae8		; return
 
-   20ace:	0c05 00a0      	cmpib #0xffa0,%d5
+   20ace:	0c05 00a0      	cmpib #0xa0,%d5		; no error, alt sector used
    20ad2:	6714           	beqs 0x20ae8		; return
 
-   20ad4:	0c05 00ff      	cmpib #-1,%d5
+   20ad4:	0c05 00ff      	cmpib #0xff,%d5		; impossible
    20ad8:	670e           	beqs 0x20ae8		; return
 
-   20ada:	4a05           	tstb %d5
+   20ada:	4a05           	tstb %d5		; never should happen
    20adc:	670a           	beqs 0x20ae8		; return
 
+; Some kind of error, report it
    20ade:	2f0b           	movel %a3,%sp@-
-   20ae0:	4eb9 0002 0a14 	jsr 0x20a14
+   20ae0:	4eb9 0002 0a14 	jsr 0x20a14		; hd_error ( stb )
    20ae6:	588f           	addql #4,%sp
 
    20ae8:	4cee 38e0 ffe8 	moveml %fp@(-24),%d5-%d7/%a3-%a5
@@ -1009,7 +1044,10 @@
 
 ; =====================================
 
-; subroutine hd_1
+; subroutine hd_init ( stuff )
+
+; This gets passed a big block of "stuff"
+; from which it pulls two items (sectors/track and heads/cylinder)
 
    20af2:	4e56 fff0      	linkw %fp,#-16
    20af6:	4a2f ff7c      	tstb %sp@(-132)
@@ -1019,6 +1057,7 @@
    20b04:	4ab9 0002 2fb2 	tstl 0x22fb2
    20b0a:	6700 00b6      	beqw 0x20bc2		; return
 
+; This actually never gets used in this routine
    20b0e:	287c 001f f8a0 	moveal #0x1ff8a0,%a4	; multibus - CWC
 
    20b14:	42a7           	clrl %sp@-
@@ -1026,8 +1065,8 @@
    20b18:	42a7           	clrl %sp@-
    20b1a:	42a7           	clrl %sp@-
    20b1c:	2f3c 0000 0600 	movel #0x600,%sp@-
-   20b22:	2f3c 0000 0001 	movel #1,%sp@-
-   20b28:	42a7           	clrl %sp@-
+   20b22:	2f3c 0000 0001 	movel #1,%sp@-		; cmd = 1 (reset WDC)
+   20b28:	42a7           	clrl %sp@-		; unit 0
    20b2a:	4eb9 0002 0bcc 	jsr 0x20bcc		; hd_command ()
    20b30:	defc 001c      	addaw #0x1c,%sp
 
@@ -1039,7 +1078,7 @@
    20b44:	6064           	bras 0x20baa
 
 ; big loop, 4 iterations
-;  is this looping over unit numbers ?
+;  Apparently looping over unit numbers.
    20b46:	42a7           	clrl %sp@-
    20b48:	4eb9 0002 0a64 	jsr 0x20a64		; hd_wait( 0 )
    20b4e:	588f           	addql #4,%sp
@@ -1048,12 +1087,36 @@
 ; We have on board ram from 0 to 3ffff
 ; So, what is at 40000 ... ???
 ; This ROM must have mapped multibus RAM to 0x40000
+; This code writes into 0x40600,
+; but the controller board sees it at 0x600
 
    20b50:	267c 0004 0600 	moveal #0x40600,%a3
 
+; build table of drive parameters
+;
+; 0,1 - bytes per sector	- 512
+; 2   - sectors / track		- 8	!! see below
+; 3   - heads / cylinder	- 17	!! see below
+; 4,5 - cyl per disk		- 0x3ff
+; 6,7 - cyl for RWC		- 0xf0
+; 8,9 - cyl for Write precomp	- 0xf0
+; 10  - normal step period	- 0x93
+; 11  - restore step period	- 0xc
+
+; XXX - an important note on the above.
+; I believe s/t and h/c are reversed.
+; i.e. the manual has it wrong.
+; I believe the software in this ROM and
+;  17 seems like a proper number for sectors/track
+; In addtion, the disk does have 8 heads.
+;
+; My drive is in fact a Rodime 204
+; which has 320 cylinders, 4 physical disks (hence 8 heads)
+; and can be formatted to 17 sectors of 512 per track.
+
    20b56:	36bc 0200      	movew #0x200,%a3@
-   20b5a:	176d 021f 0002 	moveb %a5@(543),%a3@(2)
-   20b60:	176d 021b 0003 	moveb %a5@(539),%a3@(3)
+   20b5a:	176d 021f 0002 	moveb %a5@(543),%a3@(2)		; s/t
+   20b60:	176d 021b 0003 	moveb %a5@(539),%a3@(3)		; h/c
    20b66:	377c 03ff 0004 	movew #0x3ff,%a3@(4)
    20b6c:	377c 00f0 0006 	movew #0xf0,%a3@(6)
    20b72:	377c 00f0 0008 	movew #0xf0,%a3@(8)
@@ -1065,8 +1128,8 @@
    20b8c:	42a7           	clrl %sp@-
    20b8e:	42a7           	clrl %sp@-
    20b90:	2f3c 0000 0600 	movel #0x600,%sp@-
-   20b96:	2f3c 0000 0011 	movel #0x11,%sp@-
-   20b9c:	2f06           	movel %d6,%sp@-		; d6 = 0, 1, 2, 3
+   20b96:	2f3c 0000 0011 	movel #0x11,%sp@-	; cmd = 0x11 (load disk parameters)
+   20b9c:	2f06           	movel %d6,%sp@-		; unit = 0, 1, 2, 3
    20b9e:	4eb9 0002 0bcc 	jsr 0x20bcc		; hd_command ()
    20ba4:	defc 001c      	addaw #0x1c,%sp
 
@@ -1095,20 +1158,29 @@
    20bda:	2a7c 001f f8a0 	moveal #0x1ff8a0,%a5		; multibus - CWC
 
    20be0:	287c 0004 0800 	moveal #0x40800,%a4	; CPB we will build
-   20be6:	267c 0004 0900 	moveal #0x40900,%a3
+   20be6:	267c 0004 0900 	moveal #0x40900,%a3	; status block
 
    20bec:	42a7           	clrl %sp@-
    20bee:	4eb9 0002 0a64 	jsr 0x20a64		; hd_wait( 0 )
    20bf4:	588f           	addql #4,%sp
 
-   20bf6:	196e 000f 0001 	moveb %fp@(15),%a4@(1)	; unit
-   20bfc:	18ae 000b      	moveb %fp@(11),%a4@	; command
+; There is more confusion here between this code and the manual
+; due to multibus byte order.
+; This only pertains to things written as bytes.
+; every byte pair is swapped relative to the manual
+; I indicate this by ** below
+
+   20bf6:	196e 000f 0001 	moveb %fp@(15),%a4@(1)	; command **
+   20bfc:	18ae 000b      	moveb %fp@(11),%a4@	; unit **
    20c00:	396e 0016 0004 	movew %fp@(22),%a4@(4)	; cyl (2 bytes)
-   20c06:	196e 001b 0002 	moveb %fp@(27),%a4@(2)	; sector
-   20c0c:	196e 001f 0003 	moveb %fp@(31),%a4@(3)	; head
+   20c06:	196e 001b 0002 	moveb %fp@(27),%a4@(2)	; head **
+   20c0c:	196e 001f 0003 	moveb %fp@(31),%a4@(3)	; sector **
    20c12:	297c 0000 0600 	movel #0x600,%a4@(10)	; system ram addr
    20c18:	000a
    20c1a:	296e 0020 0006 	movel %fp@(32),%a4@(6)	; byte count (4 bytes)
+
+; Note that the buf address argument (%fp(16)) is not used above,
+; but we copy from 0x600 into that address at the end of this routine
 
    20c20:	200b           	movel %a3,%d0
    20c22:	0480 0004 0000 	subil #0x40000,%d0
@@ -1117,6 +1189,12 @@
 ; Why this loop?
 : it writes 0xff to %a2@ 24 times, but a2 is not incremented
 ; is this a bug?
+; I think the idea was to fill the status block with 0xff,
+; but this only sets the first byte.
+; The status block is indeed 24 bytes in size.
+; It should not matter in any normal case since the status
+; block will be overwritten by 24 values from the controller.
+
    20c2c:	7e00           	moveq #0,%d7		; d7 = 0
    20c2e:	244b           	moveal %a3,%a2		; a2 = a3
    20c30:	6006           	bras 0x20c38		; enter loop
@@ -1132,25 +1210,29 @@
 ; the CWC will view it, then break it into 3 bytes
 ; to load into the CWC registers.
 ; So a4 must be pointing to a CPB we just set up.
+; Note that these registers are affected by
+; the endian business and are correct as shown here.
+; See my ** marks
 
    20c40:	2c0c           	movel %a4,%d6		; d6 = a4
    20c42:	0486 0004 0000 	subil #0x40000,%d6	; d6 -= 0x40000
    20c48:	7000           	moveq #0,%d0		; d0 = 0
    20c4a:	1006           	moveb %d6,%d0
-   20c4c:	1b40 0001      	moveb %d0,%a5@(1)	; CWC + 1
+   20c4c:	1b40 0001      	moveb %d0,%a5@(1)	; CWC + 1 **
 
    20c50:	2006           	movel %d6,%d0
    20c52:	e088           	lsrl #8,%d0		; d0 = d6 >> 8
    20c54:	0280 0000 00ff 	andil #0xff,%d0
-   20c5a:	1b40 0003      	moveb %d0,%a5@(3)	; CWC + 3
+   20c5a:	1b40 0003      	moveb %d0,%a5@(3)	; CWC + 3 **
 
    20c5e:	2006           	movel %d6,%d0
    20c60:	7210           	moveq #16,%d1		; d1 = d6 >> 16
    20c62:	e2a8           	lsrl %d1,%d0
    20c64:	0280 0000 00ff 	andil #0xff,%d0
-   20c6a:	1b40 0005      	moveb %d0,%a5@(5)	; CWC + 5
+   20c6a:	1b40 0005      	moveb %d0,%a5@(5)	; CWC + 5 **
 
-   20c6e:	1b7c 0040 0007 	moveb #0x40,%a5@(7)	; CWC + 7
+; set word length to 16 bits and GO !!
+   20c6e:	1b7c 0040 0007 	moveb #0x40,%a5@(7)	; CWC + 7 **
 
    20c74:	2f3c 0000 0001 	movel #1,%sp@-
    20c7a:	4eb9 0002 0a64 	jsr 0x20a64		; hd_wait ( 1 )
@@ -1175,12 +1257,14 @@
 
 ; ===========================================
 ; subroutine  hd_io --  one call from diskio
+;
+; hd_io ( info )
 
    20cb8:	4e56 ffd8      	linkw %fp,#-40
    20cbc:	4a2f ff7c      	tstb %sp@(-132)
    20cc0:	48ee 30fc ffd8 	moveml %d2-%d7/%a4-%a5,%fp@(-40)
 
-   20cc6:	2a6e 0008      	moveal %fp@(8),%a5
+   20cc6:	2a6e 0008      	moveal %fp@(8),%a5	; arg (info)
    20cca:	282d 0218      	movel %a5@(536),%d4
 
    20cce:	2f2d 021c      	movel %a5@(540),%sp@-
@@ -1220,19 +1304,19 @@
    20d1c:	2a00           	movel %d0,%d5
    20d1e:	2d6d 0214 fff8 	movel %a5@(532),%fp@(-8)
    20d24:	2d6d 0224 fffc 	movel %a5@(548),%fp@(-4)
-   20d2a:	49ed 0008      	lea %a5@(8),%a4
+   20d2a:	49ed 0008      	lea %a5@(8),%a4		; arg
 
    20d2e:	4855           	pea %a5@
-   20d30:	4eb9 0002 0af2 	jsr 0x20af2		; hd_1()
+   20d30:	4eb9 0002 0af2 	jsr 0x20af2		; hd_init ( info )
    20d36:	588f           	addql #4,%sp
 
-   20d38:	2f3c 0000 0200 	movel #0x200,%sp@-
-   20d3e:	2f05           	movel %d5,%sp@-
-   20d40:	2f06           	movel %d6,%sp@-
-   20d42:	2f07           	movel %d7,%sp@-
-   20d44:	4854           	pea %a4@
-   20d46:	2f3c 0000 0003 	movel #3,%sp@-
-   20d4c:	2f2e fff8      	movel %fp@(-8),%sp@-
+   20d38:	2f3c 0000 0200 	movel #0x200,%sp@-	; count (512 bytes)
+   20d3e:	2f05           	movel %d5,%sp@-		; sector
+   20d40:	2f06           	movel %d6,%sp@-		; head
+   20d42:	2f07           	movel %d7,%sp@-		; cylinder
+   20d44:	4854           	pea %a4@		; addr (buffer)
+   20d46:	2f3c 0000 0003 	movel #3,%sp@-		; cmd = 3 (Read)
+   20d4c:	2f2e fff8      	movel %fp@(-8),%sp@-	; unit
    20d50:	4eb9 0002 0bcc 	jsr 0x20bcc		; hd_command ()
    20d56:	defc 001c      	addaw #0x1c,%sp
 
@@ -1241,34 +1325,48 @@
    20d62:	4e75           	rts
 
 ; ----------------------------------------------
-; subroutine hd_x()
+; subroutine hd_boot ( arg, cyl )
+;
+; arg == 0, cyl == 0x140  is "ship"
+;   0x140 is 320
+;
+; otherwise, arg is a cylinder number
+; to boot from (default is 320)
 ;
 ; 2 calls from main boot code
 ; this may be the top level "boot from hard drive"
 
    20d64:	4e56 fdcc      	linkw %fp,#-564
    20d68:	4a2f ff7c      	tstb %sp@(-132)
+
+; Note that this routine allocates a big block on the stack.
+; This is a disk info block that hd_init expects.
+; The following lines initialize the only two entries
+; in the info block that are required by hd_init()
+
    20d6c:	2d7c 0000 0008 	movel #8,%fp@(-24)
    20d72:	ffe8
    20d74:	2d7c 0000 0011 	movel #0x11,%fp@(-28)
    20d7a:	ffe4
 
    20d7c:	486e fdcc      	pea %fp@(-564)
-   20d80:	4eb9 0002 0af2 	jsr 0x20af2		; hd_1()
+   20d80:	4eb9 0002 0af2 	jsr 0x20af2		; hd_init ( info )
    20d86:	588f           	addql #4,%sp
 
    20d88:	42a7           	clrl %sp@-
    20d8a:	42a7           	clrl %sp@-
    20d8c:	42a7           	clrl %sp@-
-   20d8e:	2f2e 000c      	movel %fp@(12),%sp@-
+   20d8e:	2f2e 000c      	movel %fp@(12),%sp@-	; cyl
    20d92:	42a7           	clrl %sp@-
-   20d94:	2f3c 0000 0010 	movel #0x10,%sp@-
-   20d9a:	2f2e 0008      	movel %fp@(8),%sp@-	; cmd :
+   20d94:	2f3c 0000 0010 	movel #0x10,%sp@-	; cmd - seek only
+   20d9a:	2f2e 0008      	movel %fp@(8),%sp@-	; unit
    20d9e:	4eb9 0002 0bcc 	jsr 0x20bcc		; hd_command ()
    20da4:	defc 001c      	addaw #0x1c,%sp
 
    20da8:	4e5e           	unlk %fp
    20daa:	4e75           	rts
+
+; ----------------------------------------------
 
 ; Unknown multibus device (MSC winchester)
    20dac:	4e56 fff0      	linkw %fp,#-16
@@ -1446,7 +1544,7 @@
    20ffc:	4a2f ff7c      	tstb %sp@(-132)
    21000:	2f0d           	movel %a5,%sp@-
 
-   21002:	2a6e 0008      	moveal %fp@(8),%a5	; arg
+   21002:	2a6e 0008      	moveal %fp@(8),%a5	; info
    21006:	2015           	movel %a5@,%d0
 
    21008:	0c80 0000 0001 	cmpil #1,%d0
@@ -1459,17 +1557,17 @@
    2101e:	6620           	bnes 0x21040
 
    21020:	4855           	pea %a5@		; 3 = MSC
-   21022:	4eb9 0002 0f4e 	jsr 0x20f4e		; msc_io
+   21022:	4eb9 0002 0f4e 	jsr 0x20f4e		; msc_io ( info )
    21028:	588f           	addql #4,%sp
 
    2102a:	6028           	bras 0x21054
 
    2102c:	4855           	pea %a5@
-   2102e:	4eb9 0002 0974 	jsr 0x20974		; fd_io
+   2102e:	4eb9 0002 0974 	jsr 0x20974		; fd_io ( info )
    21034:	60f2           	bras 0x21028
 
    21036:	4855           	pea %a5@
-   21038:	4eb9 0002 0cb8 	jsr 0x20cb8		; hd_io () -- CWC
+   21038:	4eb9 0002 0cb8 	jsr 0x20cb8		; hd_io ( info ) -- CWC
    2103e:	60e8           	bras 0x21028
 
 ;  23050 ---- ---- ---- ---- 6469 736b 696f 3a20           diskio: 
@@ -1508,9 +1606,11 @@
    2109e:	508f           	addql #8,%sp
    210a0:	2a00           	movel %d0,%d5
    210a2:	2946 0208      	movel %d6,%a4@(520)
+
    210a6:	4854           	pea %a4@
-   210a8:	4eb9 0002 0ff8 	jsr 0x20ff8		; diskio
+   210a8:	4eb9 0002 0ff8 	jsr 0x20ff8		; diskio ( info )
    210ae:	588f           	addql #4,%sp
+
    210b0:	2f3c 0000 0200 	movel #0x200,%sp@-
    210b6:	486e fe00      	pea %fp@(-512)
    210ba:	486c 0008      	pea %a4@(8)
@@ -1617,6 +1717,8 @@
    211ea:	fddc
    211ec:	2d7c 0000 0001 	movel #1,%fp@(-1064)
    211f2:	fbd8
+
+; build info block on stack
    211f4:	2d6e 0010 fbd4 	movel %fp@(16),%fp@(-1068)
    211fa:	2d6e 0014 fde8 	movel %fp@(20),%fp@(-536)
    21200:	2d6e 0018 fdec 	movel %fp@(24),%fp@(-532)
@@ -1628,9 +1730,11 @@
    21224:	2d6e 0030 fe04 	movel %fp@(48),%fp@(-508)
    2122a:	2d6e 0034 fde0 	movel %fp@(52),%fp@(-544)
    21230:	2d6e 0038 fde4 	movel %fp@(56),%fp@(-540)
+
    21236:	486e fbd4      	pea %fp@(-1068)
-   2123a:	4eb9 0002 0ff8 	jsr 0x20ff8		; diskio
+   2123a:	4eb9 0002 0ff8 	jsr 0x20ff8		; diskio ( info )
    21240:	588f           	addql #4,%sp
+
    21242:	2f3c 0000 01b8 	movel #0x1b8,%sp@-
    21248:	486e fe48      	pea %fp@(-440)
    2124c:	486e fbdc      	pea %fp@(-1060)
@@ -1878,9 +1982,11 @@
    215b8:	bcad 0448      	cmpl %a5@(1096),%d6
    215bc:	672c           	beqs 0x215ea
    215be:	2b46 0a5c      	movel %d6,%a5@(2652)
+
    215c2:	486d 0854      	pea %a5@(2132)
-   215c6:	4eb9 0002 0ff8 	jsr 0x20ff8		; diskio
+   215c6:	4eb9 0002 0ff8 	jsr 0x20ff8		; diskio ( info )
    215cc:	588f           	addql #4,%sp
+
    215ce:	2f3c 0000 0200 	movel #0x200,%sp@-
    215d4:	486d 0248      	pea %a5@(584)
    215d8:	486d 085c      	pea %a5@(2140)
@@ -1893,9 +1999,11 @@
    215f4:	41ed 0248      	lea %a5@(584),%a0
    215f8:	d1c0           	addal %d0,%a0
    215fa:	2b50 0a5c      	movel %a0@,%a5@(2652)
+
    215fe:	486d 0854      	pea %a5@(2132)
-   21602:	4eb9 0002 0ff8 	jsr 0x20ff8		; diskio
+   21602:	4eb9 0002 0ff8 	jsr 0x20ff8		; diskio ( info )
    21608:	588f           	addql #4,%sp
+
    2160a:	2f3c 0000 0200 	movel #0x200,%sp@-
    21610:	486d 0004      	pea %a5@(4)
    21614:	486d 085c      	pea %a5@(2140)
@@ -1923,9 +2031,11 @@
    2165e:	bcad 064c      	cmpl %a5@(1612),%d6
    21662:	672c           	beqs 0x21690
    21664:	2b46 0a5c      	movel %d6,%a5@(2652)
+
    21668:	486d 0854      	pea %a5@(2132)
-   2166c:	4eb9 0002 0ff8 	jsr 0x20ff8		; diskio
+   2166c:	4eb9 0002 0ff8 	jsr 0x20ff8		; diskio ( info )
    21672:	588f           	addql #4,%sp
+
    21674:	2f3c 0000 0200 	movel #0x200,%sp@-
    2167a:	486d 044c      	pea %a5@(1100)
    2167e:	486d 085c      	pea %a5@(2140)
@@ -1947,9 +2057,11 @@
    216ba:	bcad 0448      	cmpl %a5@(1096),%d6
    216be:	672c           	beqs 0x216ec
    216c0:	2b46 0a5c      	movel %d6,%a5@(2652)
+
    216c4:	486d 0854      	pea %a5@(2132)
-   216c8:	4eb9 0002 0ff8 	jsr 0x20ff8		; diskio
+   216c8:	4eb9 0002 0ff8 	jsr 0x20ff8		; diskio ( info )
    216ce:	588f           	addql #4,%sp
+
    216d0:	2f3c 0000 0200 	movel #0x200,%sp@-
    216d6:	486d 0248      	pea %a5@(584)
    216da:	486d 085c      	pea %a5@(2140)
@@ -2480,6 +2592,7 @@
    21bf2:	2e1f           	movel %sp@+,%d7
    21bf4:	4e5e           	unlk %fp
    21bf6:	4e75           	rts
+
    21bf8:	4e56 fff8      	linkw %fp,#-8
    21bfc:	4a2f ff7c      	tstb %sp@(-132)
    21c00:	2f07           	movel %d7,%sp@-
@@ -2550,6 +2663,7 @@
    21ce0:	2e1f           	movel %sp@+,%d7
    21ce2:	4e5e           	unlk %fp
    21ce4:	4e75           	rts
+
    21ce6:	4e56 fff8      	linkw %fp,#-8
    21cea:	4a2f ff7c      	tstb %sp@(-132)
    21cee:	2f0d           	movel %a5,%sp@-
@@ -3295,6 +3409,7 @@
    225ae:	4e56 f578      	linkw %fp,#-2696
    225b2:	4a2f ff7c      	tstb %sp@(-132)
 
+; may loop back here if there is trouble
    225b6:	2f3c 0000 0003 	movel #3,%sp@-
    225bc:	4eb9 0002 0134 	jsr 0x20134		; big_delay ( 3 )
    225c2:	588f           	addql #4,%sp
@@ -3512,23 +3627,24 @@
    22966:	6700 fd9c      	beqw 0x22704
    2296a:	6000 fc58      	braw 0x225c4
 
-   2296e:	2f3c 0002 3c53 	movel #0x23c53,%sp@-
+   2296e:	2f3c 0002 3c53 	movel #0x23c53,%sp@-	; "ship"
    22974:	2f3c 0002 3244 	movel #0x23244,%sp@-
    2297a:	4eb9 0002 0184 	jsr 0x20184		; strcmp
    22980:	508f           	addql #8,%sp
 
    22982:	4a80           	tstl %d0
    22984:	6720           	beqs 0x229a6
-   22986:	2f3c 0000 0140 	movel #0x140,%sp@-
+
+   22986:	2f3c 0000 0140 	movel #0x140,%sp@-	; perform ship
    2298c:	42a7           	clrl %sp@-
-   2298e:	4eb9 0002 0d64 	jsr 0x20d64		; hd_x()
+   2298e:	4eb9 0002 0d64 	jsr 0x20d64		; hd_boot( 0, 0x140 )
    22994:	508f           	addql #8,%sp
    22996:	2f3c 0002 3c58 	movel #0x23c58,%sp@-
    2299c:	4eb9 0002 193e 	jsr 0x2193e		; printf
    229a2:	588f           	addql #4,%sp
    229a4:	60fe           	bras 0x229a4
 
-   229a6:	2f3c 0002 3c7d 	movel #0x23c7d,%sp@-
+   229a6:	2f3c 0002 3c7d 	movel #0x23c7d,%sp@-	; "ships"
    229ac:	2f3c 0002 3244 	movel #0x23244,%sp@-
    229b2:	4eb9 0002 0184 	jsr 0x20184		; strcmp
    229b8:	508f           	addql #8,%sp
@@ -3536,47 +3652,62 @@
    229ba:	4a80           	tstl %d0
    229bc:	6600 00be      	bnew 0x22a7c
 
-   229c0:	2f3c 0002 3ce0 	movel #0x23ce0,%sp@-
+   229c0:	2f3c 0002 3ce0 	movel #0x23ce0,%sp@-	; "monitor"
    229c6:	2f3c 0002 3244 	movel #0x23244,%sp@-
    229cc:	4eb9 0002 0184 	jsr 0x20184		; strcmp
    229d2:	508f           	addql #8,%sp
 
    229d4:	4a80           	tstl %d0
    229d6:	6700 00dc      	beqw 0x22ab4
-   229da:	4eb9 0020 0000 	jsr 0x200000		; original bootrom ?
+
+   229da:	4eb9 0020 0000 	jsr 0x200000		; Jump back to original bootrom
    229e0:	6000 fbe2      	braw 0x225c4
+
+
+; here when ??? maybe user goes for default ??
    229e4:	42b9 0002 322c 	clrl 0x2322c
    229ea:	2f3c 0002 31a4 	movel #0x231a4,%sp@-
    229f0:	4eb9 0002 0164 	jsr 0x20164		; count_nz ( a4 )
    229f6:	588f           	addql #4,%sp
+
    229f8:	23c0 0002 3228 	movel %d0,0x23228
+
    229fe:	42a7           	clrl %sp@-
    22a00:	4eb9 0002 1bf8 	jsr 0x21bf8
    22a06:	588f           	addql #4,%sp
+
    22a08:	23c0 0002 3258 	movel %d0,0x23258
+
+;  23cb0 "boot: .... cylinder number (normally 320)? "
+
    22a0e:	2f3c 0002 3cb0 	movel #0x23cb0,%sp@-
    22a14:	4eb9 0002 193e 	jsr 0x2193e		; printf
    22a1a:	588f           	addql #4,%sp
+
    22a1c:	2f3c 0000 000a 	movel #0xa,%sp@-
    22a22:	2f3c 0002 3cdc 	movel #0x23cdc,%sp@-
    22a28:	2f3c 0002 31a4 	movel #0x231a4,%sp@-
    22a2e:	4eb9 0002 1a34 	jsr 0x21a34		; get_user ()
    22a34:	defc 000c      	addaw #0xc,%sp
+
    22a38:	4a39 0002 31a4 	tstb 0x231a4
    22a3e:	6700 fb84      	beqw 0x225c4
+
    22a42:	42b9 0002 322c 	clrl 0x2322c
    22a48:	2f3c 0002 31a4 	movel #0x231a4,%sp@-
    22a4e:	4eb9 0002 0164 	jsr 0x20164		; count_nz ( a4 )
    22a54:	588f           	addql #4,%sp
+
    22a56:	23c0 0002 3228 	movel %d0,0x23228
    22a5c:	42a7           	clrl %sp@-
    22a5e:	4eb9 0002 1bf8 	jsr 0x21bf8
    22a64:	588f           	addql #4,%sp
+
    22a66:	23c0 0002 3264 	movel %d0,0x23264
 
    22a6c:	2f00           	movel %d0,%sp@-
    22a6e:	2f39 0002 3258 	movel 0x23258,%sp@-
-   22a74:	4eb9 0002 0d64 	jsr 0x20d64		; hd_x()
+   22a74:	4eb9 0002 0d64 	jsr 0x20d64		; hd_boot ( x, cyl )
    22a7a:	508f           	addql #8,%sp
 
    22a7c:	2f3c 0002 3c83 	movel #0x23c83,%sp@-
@@ -3589,15 +3720,24 @@
    22aa2:	defc 000c      	addaw #0xc,%sp
    22aa6:	4a39 0002 31a4 	tstb 0x231a4
    22aac:	6600 ff36      	bnew 0x229e4
+
    22ab0:	6000 fb12      	braw 0x225c4
+
+;  23ce8 "boot: Unknown command, try again or type in ? "
+
    22ab4:	2f3c 0002 3ce8 	movel #0x23ce8,%sp@-
    22aba:	4eb9 0002 193e 	jsr 0x2193e		; printf
    22ac0:	588f           	addql #4,%sp
+
+;  23d17 "for help.\n
+
    22ac2:	2f3c 0002 3d17 	movel #0x23d17,%sp@-
    22ac8:	4eb9 0002 193e 	jsr 0x2193e		; printf
    22ace:	588f           	addql #4,%sp
+
    22ad0:	6000 fae4      	braw 0x225b6
-   22ad4:	4e75           	rts
+
+   22ad4:	4e75           	rts		; never reached
    22ad6:	0000
 
 ; I am betting on memcpy for the following code

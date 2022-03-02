@@ -24,7 +24,7 @@ AS = m68k-linux-gnu-as -m68000
 LD = m68k-linux-gnu-ld
 DUMP = m68k-linux-gnu-objdump -d
 
-OBJS = start.o main.o prf.o uart.o hd.o
+OBJS = start.o main.o prf.o uart.o
 
 # Note that this path will change with new gcc releases
 # requiring this Makefile to be updated.

@@ -15,44 +15,61 @@
 # This is from a Fedora package for F34 as of 2-2022
 # It does have the m68010 compiler switch
 # However, the chip in the Callan is a 68000
-# We get a 112 byte executable without optimzation
-# 84 bytes if we optimize.
+
 # The optimized code runs just fine.
-CC = m68k-linux-gnu-gcc -m68000 -O2 -fno-builtin
-#CC = m68k-linux-gnu-gcc -m68000 -fno-builtin
+#CC = m68k-linux-gnu-gcc -m68000 -O2 -fno-builtin
+CC = m68k-linux-gnu-gcc -m68000 -fno-builtin -g -ffreestanding
 
 AS = m68k-linux-gnu-as -m68000
 LD = m68k-linux-gnu-ld
 DUMP = m68k-linux-gnu-objdump -d
 
-OBJS = start.o main.o hd.o
+OBJS = start.o main.o prf.o uart.o hd.o
 
-all: cwc.img
+# Note that this path will change with new gcc releases
+# requiring this Makefile to be updated.
+# There is a way around this.
+LOPT = -T callan.lds -L /usr/lib/gcc/m68k-linux-gnu/11
+
+# My prf.c requires these routines,which are in -lgcc
+# undefined reference to `__modsi3'
+# undefined reference to `__divsi3'
+# Currently in: /usr/lib/gcc/m68k-linux-gnu/11/libgcc.a
+LIBS = -lgcc
+
+.c.o:
+	$(CC) $< -c
+
+.S.o:
+	$(AS) $< -o $@
+
+#	$(AS) -o start.o start.S
+
+all: callan.img
+
+# Address should match what is in callan.lds
+test: callan.img
+	sloader callan.img 0x10000
+
+# As of 3-1-2022, I am using gcc 11.2.1
+version:
+	$(CC) --version
 
 # Here is the crucial part, linking.
 #  the -s switch says to strip the symbol table.
 #  note the handy binary image output option!
-cwc.img:	$(OBJS)
-	$(LD) -T callan.lds --oformat binary -s -o cwc.img $(OBJS)
+callan.img:	$(OBJS)
+	$(LD) $(LOPT) --oformat binary -s -o callan.img $(OBJS) $(LIBS)
 
-cwc.elf:	$(OBJS)
-	$(LD) -T callan.lds -s -o cwc.elf $(OBJS)
+callan.elf:	$(OBJS)
+	$(LD) $(LOPT) -s -o callan.elf $(OBJS) $(LIBS)
 
-cwc.dump:	cwc.elf
-	$(DUMP) cwc.elf >cwc.dump
-
-start.o:		start.s
-	$(AS) -o start.o start.s
-
-hd.o:	hd.c
-	$(CC) -c hd.c
-
-main.o:	main.c
-	$(CC) -c main.c
+callan.dump:	callan.elf
+	$(DUMP) callan.elf >callan.dump
 
 clean:
-	rm -f $(OBJS) cwc.img 
+	rm -f $(OBJS) callan.img 
 	rm -f *.o *.dump
-	rm -f cwc.elf cwc.s
+	rm -f callan.elf callan.s
 
 # THE END
