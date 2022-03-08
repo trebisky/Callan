@@ -1484,7 +1484,9 @@
    20f4a:	4e5e           	unlk %fp
    20f4c:	4e75           	rts
 
+; =================
 ; one call from diskio -- msc_io (MSC winchester - I don't have)
+
    20f4e:	4e56 ffd8      	linkw %fp,#-40
    20f52:	4a2f ff7c      	tstb %sp@(-132)
    20f56:	48ee 30fc ffd8 	moveml %d2-%d7/%a4-%a5,%fp@(-40)
@@ -1584,6 +1586,9 @@
    21056:	4e5e           	unlk %fp
    21058:	4e75           	rts
 
+; ===========================================
+; subroutine "little_io"
+
    2105a:	4e56 fdec      	linkw %fp,#-532
    2105e:	4a2f ff7c      	tstb %sp@(-132)
    21062:	48ee 30e0 fdec 	moveml %d5-%d7/%a4-%a5,%fp@(-532)
@@ -1666,6 +1671,8 @@
    2114c:	4e5e           	unlk %fp
    2114e:	4e75           	rts
 
+; clancy_io (1 call)
+
    21150:	4e56 ffdc      	linkw %fp,#-36
    21154:	4a2f ff7c      	tstb %sp@(-132)
    21158:	48ee 30e0 ffdc 	moveml %d5-%d7/%a4-%a5,%fp@(-36)
@@ -1699,7 +1706,7 @@
    211a6:	2f3c 0000 0010 	movel #0x10,%sp@-
    211ac:	486e fff0      	pea %fp@(-16)
    211b0:	4855           	pea %a5@
-   211b2:	4eb9 0002 1480 	jsr 0x21480
+   211b2:	4eb9 0002 1480 	jsr 0x21480		; junior_io
    211b8:	defc 000c      	addaw #0xc,%sp
    211bc:	2e00           	movel %d0,%d7
    211be:	0c80 0000 0010 	cmpil #0x10,%d0
@@ -1709,8 +1716,12 @@
    211ce:	4e5e           	unlk %fp
    211d0:	4e75           	rts
 
+; ==================================
+; subroutine "big_io"
+
    211d2:	4e56 f128      	linkw %fp,#-3800
    211d6:	4a2f ff7c      	tstb %sp@(-132)
+
    211da:	23fc 0000 0001 	movel #1,0x22fb2
    211e0:	0002 2fb2
    211e4:	2d7c 0000 0001 	movel #1,%fp@(-548)
@@ -1756,7 +1767,7 @@
    21294:	486e f9a0      	pea %fp@(-1632)
    21298:	486e fe08      	pea %fp@(-504)
    2129c:	2f2e f134      	movel %fp@(-3788),%sp@-
-   212a0:	4eb9 0002 105a 	jsr 0x2105a
+   212a0:	4eb9 0002 105a 	jsr 0x2105a		; little_io
    212a6:	defc 000c      	addaw #0xc,%sp
    212aa:	302e fe08      	movew %fp@(-504),%d0
    212ae:	0280 0000 f000 	andil #0xf000,%d0
@@ -1786,11 +1797,14 @@
    21318:	2f2e 0008      	movel %fp@(8),%sp@-
    2131c:	4eb9 0002 10f0 	jsr 0x210f0
    21322:	defc 000c      	addaw #0xc,%sp
+
    21326:	2d40 f148      	movel %d0,%fp@(-3768)
+
    2132a:	486e f138      	pea %fp@(-3784)
    2132e:	486e f14c      	pea %fp@(-3764)
-   21332:	4eb9 0002 1150 	jsr 0x21150
+   21332:	4eb9 0002 1150 	jsr 0x21150		; clancy_io
    21338:	508f           	addql #8,%sp
+
    2133a:	2d40 f134      	movel %d0,%fp@(-3788)
    2133e:	4a80           	tstl %d0
    21340:	6600 ff24      	bnew 0x21266
@@ -1834,12 +1848,14 @@
    213e4:	4e5e           	unlk %fp
    213e6:	4e75           	rts
 
+; sam_io (2 calls)
+
    213e8:	4e56 fff8      	linkw %fp,#-8
    213ec:	4a2f ff7c      	tstb %sp@(-132)
    213f0:	2f3c 0000 0001 	movel #1,%sp@-
    213f6:	486e ffff      	pea %fp@(-1)
    213fa:	2f2e 0008      	movel %fp@(8),%sp@-
-   213fe:	4eb9 0002 1480 	jsr 0x21480
+   213fe:	4eb9 0002 1480 	jsr 0x21480		; junior_io
    21404:	defc 000c      	addaw #0xc,%sp
    21408:	2d40 fffa      	movel %d0,%fp@(-6)
    2140c:	0c80 0000 0001 	cmpil #1,%d0
@@ -1856,12 +1872,14 @@
    21432:	4e5e           	unlk %fp
    21434:	4e75           	rts
 
+; fred_io (8 calls)
+
    21436:	4e56 fff8      	linkw %fp,#-8
    2143a:	4a2f ff7c      	tstb %sp@(-132)
    2143e:	2f3c 0000 0004 	movel #4,%sp@-
    21444:	486e fffc      	pea %fp@(-4)
    21448:	2f2e 0008      	movel %fp@(8),%sp@-
-   2144c:	4eb9 0002 1480 	jsr 0x21480
+   2144c:	4eb9 0002 1480 	jsr 0x21480		; junior_io
    21452:	defc 000c      	addaw #0xc,%sp
    21456:	2d40 fff8      	movel %d0,%fp@(-8)
    2145a:	0c80 0000 0004 	cmpil #4,%d0
@@ -1876,6 +1894,9 @@
    2147c:	4e5e           	unlk %fp
    2147e:	4e75           	rts
 
+; ======================================
+; subroutine "junior_io" (3 calls)
+
    21480:	4e56 ffec      	linkw %fp,#-20
    21484:	4a2f ff7c      	tstb %sp@(-132)
    21488:	48ee 00f8 ffec 	moveml %d3-%d7,%fp@(-20)
@@ -1887,7 +1908,7 @@
    2149c:	b0a9 0210      	cmpl %a1@(528),%d0
    214a0:	6c00 0082      	bgew 0x21524
    214a4:	2f08           	movel %a0,%sp@-
-   214a6:	4eb9 0002 1530 	jsr 0x21530
+   214a6:	4eb9 0002 1530 	jsr 0x21530		; mega_io
    214ac:	588f           	addql #4,%sp
    214ae:	2f3c 0000 0200 	movel #0x200,%sp@-
    214b4:	206e 0008      	moveal %fp@(8),%a0
@@ -1932,6 +1953,10 @@
    21526:	4cee 00f8 ffec 	moveml %fp@(-20),%d3-%d7
    2152c:	4e5e           	unlk %fp
    2152e:	4e75           	rts
+
+; ================================
+; subroutine "mega_io"
+
    21530:	4e56 ffec      	linkw %fp,#-20
    21534:	4a2f ff7c      	tstb %sp@(-132)
    21538:	48ee 30c0 ffec 	moveml %d6-%d7/%a4-%a5,%fp@(-20)
@@ -2852,7 +2877,9 @@
    21f8c:	4e5e           	unlk %fp
    21f8e:	4e75           	rts
 
-; subroutine, one call during startup
+; =============================================
+; big subroutine, one call during startup
+; "mama"
 
    21f90:	4e56 ff08      	linkw %fp,#-248
    21f94:	4a2f ff7c      	tstb %sp@(-132)
@@ -3138,7 +3165,9 @@
 ;  239a0 ---- ---- ---- ---- ---- 626f 6f74 3a20             boot: 
 ;  239b0 00
 
-; subroutine - send "boot: " prompt  PROMPT
+; subroutine - send "boot: " prefix  PREFIX
+; It just prefixes a whole series of lines in this way
+; when listing the manner in which the system will boot
 
    22418:	4e56 0000      	linkw %fp,#0
    2241c:	4a2f ff7c      	tstb %sp@(-132)
@@ -3311,37 +3340,39 @@
 
 ; =========================================
 
+; donkey_io
+
    22490:	4e56 ffdc      	linkw %fp,#-36
    22494:	4a2f ff7c      	tstb %sp@(-132)
    22498:	48ee 38f8 ffdc 	moveml %d3-%d7/%a3-%a5,%fp@(-36)
    2249e:	2a6e 0008      	moveal %fp@(8),%a5
    224a2:	4855           	pea %a5@
-   224a4:	4eb9 0002 1436 	jsr 0x21436
+   224a4:	4eb9 0002 1436 	jsr 0x21436		; fred_io
    224aa:	588f           	addql #4,%sp
    224ac:	2e00           	movel %d0,%d7
    224ae:	4855           	pea %a5@
-   224b0:	4eb9 0002 1436 	jsr 0x21436
+   224b0:	4eb9 0002 1436 	jsr 0x21436		; fred_io
    224b6:	588f           	addql #4,%sp
    224b8:	2c00           	movel %d0,%d6
    224ba:	4855           	pea %a5@
-   224bc:	4eb9 0002 1436 	jsr 0x21436
+   224bc:	4eb9 0002 1436 	jsr 0x21436		; fred_io
    224c2:	588f           	addql #4,%sp
    224c4:	2a00           	movel %d0,%d5
    224c6:	4855           	pea %a5@
-   224c8:	4eb9 0002 1436 	jsr 0x21436
+   224c8:	4eb9 0002 1436 	jsr 0x21436		; fred_io
    224ce:	588f           	addql #4,%sp
    224d0:	2800           	movel %d0,%d4
    224d2:	4855           	pea %a5@
-   224d4:	4eb9 0002 1436 	jsr 0x21436
+   224d4:	4eb9 0002 1436 	jsr 0x21436		; fred_io
    224da:	588f           	addql #4,%sp
    224dc:	4855           	pea %a5@
-   224de:	4eb9 0002 1436 	jsr 0x21436
+   224de:	4eb9 0002 1436 	jsr 0x21436		; fred_io
    224e4:	588f           	addql #4,%sp
    224e6:	4855           	pea %a5@
-   224e8:	4eb9 0002 1436 	jsr 0x21436
+   224e8:	4eb9 0002 1436 	jsr 0x21436		; fred_io
    224ee:	588f           	addql #4,%sp
    224f0:	4855           	pea %a5@
-   224f2:	4eb9 0002 1436 	jsr 0x21436
+   224f2:	4eb9 0002 1436 	jsr 0x21436		; fred_io
    224f8:	588f           	addql #4,%sp
    224fa:	2840           	moveal %d0,%a4
    224fc:	264c           	moveal %a4,%a3
@@ -3357,7 +3388,7 @@
    22526:	7600           	moveq #0,%d3
    22528:	600e           	bras 0x22538
    2252a:	4855           	pea %a5@
-   2252c:	4eb9 0002 13e8 	jsr 0x213e8
+   2252c:	4eb9 0002 13e8 	jsr 0x213e8		; sam_io
    22532:	588f           	addql #4,%sp
    22534:	16c0           	moveb %d0,%a3@+
    22536:	5283           	addql #1,%d3
@@ -3370,7 +3401,7 @@
    2254c:	7600           	moveq #0,%d3
    2254e:	600e           	bras 0x2255e
    22550:	4855           	pea %a5@
-   22552:	4eb9 0002 13e8 	jsr 0x213e8
+   22552:	4eb9 0002 13e8 	jsr 0x213e8		; sam_io
    22558:	588f           	addql #4,%sp
    2255a:	16c0           	moveb %d0,%a3@+
    2255c:	5283           	addql #1,%d3
@@ -3414,6 +3445,7 @@
    225bc:	4eb9 0002 0134 	jsr 0x20134		; big_delay ( 3 )
    225c2:	588f           	addql #4,%sp
 
+; may also loop back here
    225c4:	2f3c 0002 3230 	movel #0x23230,%sp@-
    225ca:	2f3c 0002 3a38 	movel #0x23a38,%sp@-
    225d0:	4eb9 0002 01b0 	jsr 0x201b0		; move ( 0x23a38 >> 0x23230 )
@@ -3445,7 +3477,7 @@
    2264a:	4eb9 0002 01b0 	jsr 0x201b0		; move ( 0x23a3c >> 0x23280 )
    22650:	508f           	addql #8,%sp
 
-; first big greeting menu
+; MAIN: first big greeting menu
 
    22652:	2f3c 0002 32e8 	movel #0x232e8,%sp@-
    22658:	42a7           	clrl %sp@-
@@ -3465,9 +3497,9 @@
    22690:	588f           	addql #4,%sp
 
    22692:	23c0 0002 3228 	movel %d0,0x23228
-   22698:	4eb9 0002 1f90 	jsr 0x21f90
+   22698:	4eb9 0002 1f90 	jsr 0x21f90		; mama
 
-   2269e:	2f3c 0002 3a42 	movel #0x23a42,%sp@-
+   2269e:	2f3c 0002 3a42 	movel #0x23a42,%sp@-	; '?'
    226a4:	2f3c 0002 3244 	movel #0x23244,%sp@-
    226aa:	4eb9 0002 0184 	jsr 0x20184		; strcmp
    226b0:	508f           	addql #8,%sp
@@ -3475,7 +3507,7 @@
    226b2:	4a80           	tstl %d0
    226b4:	6734           	beqs 0x226ea
 
-; second big greeting menu
+; MAIN: second big greeting menu
 
    226b6:	2f3c 0002 3304 	movel #0x23304,%sp@-
    226bc:	2f3c 0000 0006 	movel #6,%sp@-
@@ -3489,6 +3521,12 @@
    226e2:	defc 000c      	addaw #0xc,%sp
    226e6:	6000 fedc      	braw 0x225c4
 
+;  23a40 0000 3f00 0000 0066 0062 0044 7269 7665     ?    f b Drive
+;  23a50 7220 6e61 6d65 202e 2e2e 2e2e 2e2e 2e2e   r name .........
+;  23a60 2e2e 2e2e 2e2e 2e2e 2e2e 2e2e 2060 2573   ............ `%s
+;  23a70 270a 0044 7269 7665 7220 6e75 6d62 6572   '  Driver number
+;  23a80 202e 2e2e 2e2e 2e2e 2e2e 2e2e 2e2e 2e2e    ...............
+
    226ea:	2f3c 0002 3a45 	movel #0x23a45,%sp@-
    226f0:	2f3c 0002 3244 	movel #0x23244,%sp@-
    226f6:	4eb9 0002 0184 	jsr 0x20184		; strcmp
@@ -3496,6 +3534,7 @@
 
    226fe:	4a80           	tstl %d0
    22700:	6700 0092      	beqw 0x22794
+
    22704:	2f39 0002 327c 	movel 0x2327c,%sp@-
    2270a:	2f39 0002 3278 	movel 0x23278,%sp@-
    22710:	2f39 0002 3274 	movel 0x23274,%sp@-
@@ -3521,10 +3560,11 @@
    2276c:	2f3c 0000 0002 	movel #2,%sp@-
    22772:	486e f578      	pea %fp@(-2696)
    22776:	2f3c 0002 3280 	movel #0x23280,%sp@-
-   2277c:	4eb9 0002 11d2 	jsr 0x211d2
+   2277c:	4eb9 0002 11d2 	jsr 0x211d2		; big_io
    22782:	defc 0034      	addaw #0x34,%sp
+
    22786:	486e f578      	pea %fp@(-2696)
-   2278a:	4eb9 0002 2490 	jsr 0x22490
+   2278a:	4eb9 0002 2490 	jsr 0x22490		; donkey_io
    22790:	6000 fe30      	braw 0x225c2
 
    22794:	2f3c 0002 3a47 	movel #0x23a47,%sp@-
@@ -3543,88 +3583,117 @@
    227c0:	4a80           	tstl %d0
    227c2:	6700 01aa      	beqw 0x2296e
 
-   227c6:	4eb9 0002 2418 	jsr 0x22418		; prompt
+; This just sends "boot: ", but does not wait for input
+; so it is not really a prompt, but just prefixes every
+; printf with "boot: "
+   227c6:	4eb9 0002 2418 	jsr 0x22418		; prefix
+
+;  23a40 ---- ---- ---- ---- ---- --44 7269 7665              Drive
+;  23a50 7220 6e61 6d65 202e 2e2e 2e2e 2e2e 2e2e   r name .........
+;  23a60 2e2e 2e2e 2e2e 2e2e 2e2e 2e2e 2060 2573   ............ `%s'
+
    227cc:	2f3c 0002 3230 	movel #0x23230,%sp@-
    227d2:	2f3c 0002 3a4b 	movel #0x23a4b,%sp@-
    227d8:	4eb9 0002 193e 	jsr 0x2193e		; printf
    227de:	508f           	addql #8,%sp
-   227e0:	4eb9 0002 2418 	jsr 0x22418		; prompt
+
+   227e0:	4eb9 0002 2418 	jsr 0x22418		; prefix
+
+;  23a70 ---- --44 7269 7665 7220 6e75 6d62 6572   '  Driver number
+;  23a80 202e 2e2e 2e2e 2e2e 2e2e 2e2e 2e2e 2e2e    ...............
+
    227e6:	2f39 0002 3258 	movel 0x23258,%sp@-
    227ec:	2f3c 0002 3a73 	movel #0x23a73,%sp@-
    227f2:	4eb9 0002 193e 	jsr 0x2193e		; printf
    227f8:	508f           	addql #8,%sp
-   227fa:	4eb9 0002 2418 	jsr 0x22418		; prompt
+
+   227fa:	4eb9 0002 2418 	jsr 0x22418		; prefix
    22800:	2f39 0002 325c 	movel 0x2325c,%sp@-
    22806:	2f3c 0002 3a99 	movel #0x23a99,%sp@-
    2280c:	4eb9 0002 193e 	jsr 0x2193e		; printf
    22812:	508f           	addql #8,%sp
-   22814:	4eb9 0002 2418 	jsr 0x22418		; prompt
+
+   22814:	4eb9 0002 2418 	jsr 0x22418		; prefix
    2281a:	2f39 0002 3260 	movel 0x23260,%sp@-
    22820:	2f3c 0002 3abf 	movel #0x23abf,%sp@-
    22826:	4eb9 0002 193e 	jsr 0x2193e		; printf
    2282c:	508f           	addql #8,%sp
-   2282e:	4eb9 0002 2418 	jsr 0x22418		; prompt
+
+   2282e:	4eb9 0002 2418 	jsr 0x22418		; prefix
    22834:	2f39 0002 3264 	movel 0x23264,%sp@-
    2283a:	2f3c 0002 3ae5 	movel #0x23ae5,%sp@-
    22840:	4eb9 0002 193e 	jsr 0x2193e		; printf
    22846:	508f           	addql #8,%sp
-   22848:	4eb9 0002 2418 	jsr 0x22418		; prompt
+
+   22848:	4eb9 0002 2418 	jsr 0x22418		; prefix
    2284e:	2f39 0002 3268 	movel 0x23268,%sp@-
    22854:	2f3c 0002 3b0b 	movel #0x23b0b,%sp@-
    2285a:	4eb9 0002 193e 	jsr 0x2193e		; printf
    22860:	508f           	addql #8,%sp
-   22862:	4eb9 0002 2418 	jsr 0x22418		; prompt
+
+   22862:	4eb9 0002 2418 	jsr 0x22418		; prefix
    22868:	2f39 0002 326c 	movel 0x2326c,%sp@-
    2286e:	2f3c 0002 3b31 	movel #0x23b31,%sp@-
    22874:	4eb9 0002 193e 	jsr 0x2193e		; printf
    2287a:	508f           	addql #8,%sp
-   2287c:	4eb9 0002 2418 	jsr 0x22418		; prompt
+
+   2287c:	4eb9 0002 2418 	jsr 0x22418		; prefix
    22882:	2f39 0002 3270 	movel 0x23270,%sp@-
    22888:	2f3c 0002 3b57 	movel #0x23b57,%sp@-
    2288e:	4eb9 0002 193e 	jsr 0x2193e		; printf
    22894:	508f           	addql #8,%sp
-   22896:	4eb9 0002 2418 	jsr 0x22418		; prompt
+
+   22896:	4eb9 0002 2418 	jsr 0x22418		; prefix
    2289c:	2f39 0002 3274 	movel 0x23274,%sp@-
    228a2:	2f3c 0002 3b7d 	movel #0x23b7d,%sp@-
    228a8:	4eb9 0002 193e 	jsr 0x2193e		; printf
    228ae:	508f           	addql #8,%sp
-   228b0:	4eb9 0002 2418 	jsr 0x22418		; prompt
+
+   228b0:	4eb9 0002 2418 	jsr 0x22418		; prefix
    228b6:	2f39 0002 3240 	movel 0x23240,%sp@-
    228bc:	2f3c 0002 3ba3 	movel #0x23ba3,%sp@-
    228c2:	4eb9 0002 193e 	jsr 0x2193e		; printf
    228c8:	508f           	addql #8,%sp
-   228ca:	4eb9 0002 2418 	jsr 0x22418		; prompt
+
+   228ca:	4eb9 0002 2418 	jsr 0x22418		; prefix
    228d0:	2f39 0002 3278 	movel 0x23278,%sp@-
    228d6:	2f3c 0002 3bc9 	movel #0x23bc9,%sp@-
    228dc:	4eb9 0002 193e 	jsr 0x2193e		; printf
    228e2:	508f           	addql #8,%sp
-   228e4:	4eb9 0002 2418 	jsr 0x22418		; prompt
+
+   228e4:	4eb9 0002 2418 	jsr 0x22418		; prefix
    228ea:	2f39 0002 327c 	movel 0x2327c,%sp@-
    228f0:	2f3c 0002 3bef 	movel #0x23bef,%sp@-
    228f6:	4eb9 0002 193e 	jsr 0x2193e		; printf
    228fc:	508f           	addql #8,%sp
-   228fe:	4eb9 0002 2418 	jsr 0x22418		; prompt
+
+   228fe:	4eb9 0002 2418 	jsr 0x22418		; prefix
    22904:	2f3c 0002 3280 	movel #0x23280,%sp@-
    2290a:	2f3c 0002 3c15 	movel #0x23c15,%sp@-
    22910:	4eb9 0002 193e 	jsr 0x2193e		; printf
    22916:	508f           	addql #8,%sp
-   22918:	4eb9 0002 2418 	jsr 0x22418		; prompt
+
+   22918:	4eb9 0002 2418 	jsr 0x22418		; prefix
    2291e:	2f3c 0002 3c3d 	movel #0x23c3d,%sp@-
    22924:	4eb9 0002 193e 	jsr 0x2193e		; printf
    2292a:	588f           	addql #4,%sp
+
    2292c:	2f3c ffff ffff 	movel #-1,%sp@-
    22932:	2f3c 0002 3c51 	movel #0x23c51,%sp@-
    22938:	2f3c 0002 31a4 	movel #0x231a4,%sp@-
    2293e:	4eb9 0002 1a34 	jsr 0x21a34		; get_user ()
    22944:	defc 000c      	addaw #0xc,%sp
-   22948:	0c39 0079 0002 	cmpib #0x79,0x231a4
+
+   22948:	0c39 0079 0002 	cmpib #0x79,0x231a4	; 'y'
    2294e:	31a4
    22950:	6700 fdb2      	beqw 0x22704
-   22954:	0c39 0059 0002 	cmpib #0x59,0x231a4
+   22954:	0c39 0059 0002 	cmpib #0x59,0x231a4	; 'Y'
    2295a:	31a4
    2295c:	6700 fda6      	beqw 0x22704
+
    22960:	4a39 0002 31a4 	tstb 0x231a4
    22966:	6700 fd9c      	beqw 0x22704
+
    2296a:	6000 fc58      	braw 0x225c4
 
    2296e:	2f3c 0002 3c53 	movel #0x23c53,%sp@-	; "ship"

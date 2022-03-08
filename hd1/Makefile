@@ -24,18 +24,20 @@ AS = m68k-linux-gnu-as -m68000
 LD = m68k-linux-gnu-ld
 DUMP = m68k-linux-gnu-objdump -d
 
-OBJS = start.o main.o prf.o uart.o hd.o
+OBJS = start.o main.o prf.o uart.o hd.o util.o
 
-# Note that this path will change with new gcc releases
-# requiring this Makefile to be updated.
-# There is a way around this.
-LOPT = -T callan.lds -L /usr/lib/gcc/m68k-linux-gnu/11
+# Note that the path for libgcc will change with new gcc
+# releases, which would require this Makefile to be updated
+# whenever a new release came out.
+# There is a way around this, but I now avoid this entirely
+#LOPT = -T callan.lds -L /usr/lib/gcc/m68k-linux-gnu/11
+LOPT = -T callan.lds -L .
 
 # My prf.c requires these routines,which are in -lgcc
 # undefined reference to `__modsi3'
 # undefined reference to `__divsi3'
 # Currently in: /usr/lib/gcc/m68k-linux-gnu/11/libgcc.a
-LIBS = -lgcc
+LIBS = -lm68k
 
 .c.o:
 	$(CC) $< -c
@@ -46,6 +48,9 @@ LIBS = -lgcc
 #	$(AS) -o start.o start.S
 
 all: callan.img
+
+getlib:
+	cp ../libgcc/libm68k.a .
 
 # Address should match what is in callan.lds
 test: callan.img
@@ -62,7 +67,8 @@ callan.img:	$(OBJS)
 	$(LD) $(LOPT) --oformat binary -s -o callan.img $(OBJS) $(LIBS)
 
 callan.elf:	$(OBJS)
-	$(LD) $(LOPT) -s -o callan.elf $(OBJS) $(LIBS)
+	#$(LD) $(LOPT) -s -o callan.elf $(OBJS) $(LIBS)
+	$(LD) $(LOPT) -o callan.elf $(OBJS) $(LIBS)
 
 callan.dump:	callan.elf
 	$(DUMP) callan.elf >callan.dump

@@ -27,6 +27,7 @@
  */
 
 #include <stdarg.h>
+#include "protos.h"
 
 void uart_puts ( char * );
 
@@ -61,6 +62,7 @@ sprintf ( char *buf, char *fmt, ... )
 
 /* Here I develop a simple printf.
  * It only has 3 triggers:
+ *  (it has more now)
  *  %s to inject a string
  *  %d to inject a decimal number
  *  %h to inject a 32 bit hex value as xxxxyyyy
@@ -68,7 +70,8 @@ sprintf ( char *buf, char *fmt, ... )
 
 #define PUTCHAR(x)      if ( buf <= end ) *buf++ = (x)
 
-static const char hex_table[] = "0123456789ABCDEF";
+// static const char hex_table[] = "0123456789ABCDEF";
+static char hex_table[] = "0123456789ABCDEF";
 
 // #define HEX(x)  ((x)<10 ? '0'+(x) : 'A'+(x)-10)
 #define HEX(x)  hex_table[(x)]
@@ -100,6 +103,18 @@ sprintnb ( char *buf, char *end, int n, int b)
 }
 #endif
 
+/* Compiling for the mc6800 got us into
+ * trouble with this routine.
+ * using a % modulo operator hauled in modsi3
+ * from the gcc library, which apparently has some
+ * mc68020 illegal opcodes for the mc68000 or
+ * something of the sort.
+ * At any rate, we ended up getting address error
+ * exceptions.
+ * I ended up chasing down mc68000 routines coded in
+ * assembly language from gcc-2.95, for which take
+ * a look at the libgcc project.
+ */
 static char *
 sprintn ( char *buf, char *end, int n )
 {
@@ -113,7 +128,6 @@ sprintn ( char *buf, char *end, int n )
         cp = prbuf;
 
         do {
-            // *cp++ = "0123456789"[n%10];
             *cp++ = hex_table[n%10];
             n /= 10;
         } while (n);

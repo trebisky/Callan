@@ -1,4 +1,5 @@
 *.o
+*.a
 rom_image
 *.elf
 *.dis
