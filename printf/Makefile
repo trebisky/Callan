@@ -26,16 +26,12 @@ DUMP = m68k-linux-gnu-objdump -d
 
 OBJS = start.o main.o prf.o uart.o
 
-# Note that this path will change with new gcc releases
-# requiring this Makefile to be updated.
-# There is a way around this.
-LOPT = -T callan.lds -L /usr/lib/gcc/m68k-linux-gnu/11
+LOPT = -T callan.lds -L .
 
 # My prf.c requires these routines,which are in -lgcc
 # undefined reference to `__modsi3'
 # undefined reference to `__divsi3'
-# Currently in: /usr/lib/gcc/m68k-linux-gnu/11/libgcc.a
-LIBS = -lgcc
+LIBS = -lm68k
 
 .c.o:
 	$(CC) $< -c
@@ -46,6 +42,9 @@ LIBS = -lgcc
 #	$(AS) -o start.o start.S
 
 all: callan.img
+
+getlib:
+	cp ../libgcc/libm68k.a .
 
 # Address should match what is in callan.lds
 test: callan.img

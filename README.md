@@ -11,5 +11,6 @@ remote "stub" protocol.
 -- toS - C program to generate S records
 -- Srecord - a tool to download S records
 -- First - a first tiny test to download and run
+-- libgcc - vital routines from libgcc in assembler
 -- printf - set up a C development framework
 -- hd1 - experimental driver for the hard drive controller
