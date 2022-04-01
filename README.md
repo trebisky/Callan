@@ -14,3 +14,4 @@ remote "stub" protocol.
 -- libgcc - vital routines from libgcc in assembler
 -- printf - set up a C development framework
 -- hd1 - experimental driver for the hard drive controller
+-- cwc-firmware - analysis of firmware in the hard drive controller

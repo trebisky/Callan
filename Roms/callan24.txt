@@ -1108,7 +1108,7 @@
 ; i.e. the manual has it wrong.
 ; I believe the software in this ROM and
 ;  17 seems like a proper number for sectors/track
-; In addtion, the disk does have 8 heads.
+; In addition, the disk does have 8 heads.
 ;
 ; My drive is in fact a Rodime 204
 ; which has 320 cylinders, 4 physical disks (hence 8 heads)

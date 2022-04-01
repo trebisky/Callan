@@ -31,6 +31,11 @@
 ; returns to this code.
 
 ; -------------------------------------------------------
+; These two values are loaded by the processor on reset.
+; On reset, the board is in "boot state" which maps the ROM to
+; address zero.  After initializing the segment and page table
+; the ROM code will exit boot state, which will expose onboard
+; RAM at address 0
 
   200000:	0000 1000      	; reset SP
   200004:	0020 00b0      	; reset PC
@@ -75,29 +80,49 @@
   200068:	4e56 ffe4      	linkw %fp,#-28
   20006c:	48ee 1ce4 ffe4 	moveml %d2/%d5-%d7/%a2-%a4,%fp@(-28)
 
+; ===============================================
 ; level 7 autovector comes here.
 ; this is in response to timer x and the purpose is to drive
 ; the DRAM refresh code.
+; 
+; the manual says that the timer is set up to run this every 2 ms
+; (500 times each second)
 
   200072:	2f00           	movel %d0,%sp@-		; level 7 interrupt
   200074:	33fc ffe3 0080 	movew #0xffe3,0x800002
   20007a:	0002
   20007c:	4eb9 0000 0100 	jsr 0x100		; in RAM
   200082:	54b9 0000 0274 	addql #2,0x274		; only place accessed !?
+
+; ================================================
+; This calls a code fragment that checks if we have
+; an extension ROM.
+; If we do, we branch back to 200092
+; If not, we branch back to 2000a4
+;
+; Why is this being done every time we handle an NMI exception?
+; No doubt about it, this is weird -- and the code is a mess.
+;
+; It may be because the way the initial exception vectors are set up,
+; we may have been running the exception ROM code, and we will need
+; to go back to it?  It would seem that the RTE instruction would know
+; what to do.
+
   200088:	4ef9 0020 1e90 	jmp 0x201e90
 
 ; no path to here ??
   20008e:	4880           	extw %d0
   200090:	48c0           	extl %d0
 
-; odd jump to here from 201ea8
+; The NMI code comes here when we have an extension ROM
   200092:	0280 0000 0080 	andil #0x80,%d0
   200098:	6764           	beqs 0x2000fe
 
   20009a:	23fc 0000 0001 	movel #1,0x266		; serial_flag
   2000a0:	0000 0266
 
-; odd jump to here from 201e9c (and 200104)
+; The NMI code comes here when we do NOT have an extension ROM
+;   jump to here from 201e9c (and 200104)
   2000a4:	201f           	movel %sp@+,%d0
   2000a6:	13fc 0010 0060 	moveb #0x10,0x600002	; serial port A ctrl
   2000ac:	0002
@@ -187,11 +212,12 @@
   200152:	6dde           	blts 0x200132		; loop
 
 ; This is a write to the first word of this boot ROM.
-; This unmaps the ROM from address 0 where it first must be mapped
-; for RESET to work.  Note that immediately after this, code begins
-; writing to RAM
+; This unmaps the ROM from address 0 where it first must be mapped for RESET to work.
+; we have to do this to be able to access RAM at address 0
+; Note that immediately after this, code begins writing to RAM
+;
 ; The manual calls it "boot state" (see page 39) when the ROM is
-; mapped to base address zero, and this write exits boot state
+; mapped to base address zero, and this write exits boot state.
 
   200154:	33fc 0001 0020 	movew #1,0x200000	; exit boot state
   20015a:	0000
@@ -199,15 +225,19 @@
   20015c:	23fc 0020 037c 	movel #0x20037c,0x8	; first vector (bus error)
   200162:	0000 0008
 
+; call this subroutine to determine how much RAM we have
+; it returns a page count in d0
   200166:	4eb9 0020 10ec 	jsr 0x2010ec
 
+; convert page count to byte count
   20016c:	720b           	moveq #0xb,%d1
-  20016e:	e3a0           	asll %d1,%d0
-  200170:	2e00           	movel %d0,%d7
-  200172:	287c 0000 0000 	moveal #0,%a4
+  20016e:	e3a0           	asll %d1,%d0		; d0 = page_count << 11
+  200170:	2e00           	movel %d0,%d7		; d7 = d0
+  200172:	287c 0000 0000 	moveal #0,%a4		; a4 = 0
   200178:	6006           	bras 0x200180
 
-  20017a:	28fc ffff ffff 	movel #-1,%a4@+
+; start at 0 and fill memory with -1
+  20017a:	28fc ffff ffff 	movel #-1,%a4@+		; fill with -1
   200180:	b9c7           	cmpal %d7,%a4
   200182:	65f6           	bcss 0x20017a		; loop
 
@@ -279,6 +309,15 @@
   20020a:	33fc ff24 0080 	movew #0xff24,0x800002	; arm timer 3
   200210:	0002
 
+; ------------------------
+; Now we are going to set up the vector table in RAM.
+; since this is a 68000, it must be located at address 0
+; Each entry in the vector table is a new PC value, and hence 4 bytes in size.
+; There are 256 vectors, so the table could occupy 0 to 0x3ff
+; However, this only initializes to 0x0bc (the end of the TRAPV vectors).
+; From 0x0c0 to 0x0ff is unused (as near as I can tell right now).
+; Then at 0x100 is the code to handle refresh
+
 ; make vector table from 4 to 0xbc call "32" (Un)
   200212:	287c 0000 00bc 	moveal #0xbc,%a4
   200218:	28bc 0020 0032 	movel #0x200032,%a4@
@@ -344,9 +383,10 @@
   2002ee:	42ab 0066      	clrl %a3@(0x66)
 
 ; ==============================================
-; The following call runs the extension ROM if there is one.
+; The following call will run the extension ROM if there is one.
+; If there is not one, it reads a character and returns
 
-  2002f2:	4eb9 0020 1eae 	jsr 0x201eae		; go run the extension ROM
+  2002f2:	4eb9 0020 1eae 	jsr 0x201eae
   2002f8:	4e71           	nop
 
 ; fall through here if the extension ROM returns,
@@ -354,9 +394,37 @@
 ; I'll note that the Callan extension ROM never returns.
 ; so falling through into this code is what runs the
 ; ROM monitor.
+;
 ; Note that this rattles through into exception handling code
 ; the next 3 instructions must set up something that looks
-; like and extension stack frame.
+; like an exception stack frame.
+;
+; So ... this is as good a place as any to summarize what I know
+; about 68000 exception handling.
+;
+; First, the SR.  the upper byte is a "system byte" and
+; the lower bytes is the user byte (the usual condition codes).
+; The system byte has:
+;  0x8000 = trace mode
+;  0x2000 = supervisor mode
+;  0x0700 = interrupt mask
+;
+; Note tha you need at least a 68010 to have a VBR.
+; With a 68000 the vectors are always at 0
+; These could be in ROM when in boot mode,
+; but that is not how things are done here.
+;
+; Reset puts the processor in supervisor mode, with
+; trace mode off and the interrupt priority at 7.
+;
+; The way interrupt priority works is that all interrupts
+; at a level less than the current priority are ignored.
+; Therefore level 7 can never be masked off.
+;
+; An exception puts 3 words of 16 bits on the stack:
+;  SR
+;  PC-high
+;  PC-low
 
 ; Jumped to from below
   2002fa:	2f3c 0000 0000 	movel #0,%sp@-
@@ -364,10 +432,12 @@
   200302:	3f3c 0000      	movew #0,%sp@-
 
 ; common code for exception handlers below
-  200306:	598f           	subql #4,%sp
+; note that 2 bytes have been added to the top
+; of the stack indicating what the exception is.
+  200306:	598f           	subql #4,%sp		; space for usp
   200308:	48e7 ffff      	moveml %d0-%sp,%sp@-
   20030c:	4e68           	movel %usp,%a0
-  20030e:	2f48 0040      	movel %a0,%sp@(64)
+  20030e:	2f48 0040      	movel %a0,%sp@(64)	; save usp also
   200312:	46fc 2700      	movew #0x2700,%sr
   200316:	4eb9 0020 09f4 	jsr 0x2009f4
   20031c:	206f 0040      	moveal %sp@(64),%a0
@@ -414,6 +484,9 @@
 ; soon thereafter by a mapping to the above.
 ; It doesn't do much, it must just make the system immune
 ; to bus errors during early initialization.
+; Note that bus error has 8 bytes of extra stuff at the top
+; of the stack, we have to strip that off so that RTE will work.
+
   20037c:	508f           	addql #8,%sp
   20037e:	4e73           	rte
 
@@ -471,8 +544,10 @@
   200416:	4e5e           	unlk %fp
   200418:	4e75           	rts
 
+; read another byte
   20041a:	4e56 0000      	linkw %fp,#0
   20041e:	48ee 0000 0000 	moveml #0,%fp@()
+
   200424:	2079 0000 025a 	moveal 0x25a,%a0
   20042a:	0c10 000d      	cmpib #0xd,%a0@
   20042e:	6604           	bnes 0x200434
@@ -486,6 +561,9 @@
   200446:	48c0           	extl %d0
   200448:	4e5e           	unlk %fp
   20044a:	4e75           	rts
+
+; subroutine - returns byte from 0x25a
+
   20044c:	4e56 0000      	linkw %fp,#0
   200450:	48ee 0000 0000 	moveml #0,%fp@()
   200456:	2079 0000 025a 	moveal 0x25a,%a0
@@ -557,40 +635,52 @@
   200510:	6100 fe7a      	bsrw 0x20038c
   200514:	4e5e           	unlk %fp
   200516:	4e75           	rts
+
+; -----------------------------------------------------
+; subroutine to convert a single character that is supposed
+; to be part of a hex value
+; "hex_digit"
+
   200518:	4e56 fffc      	linkw %fp,#-4
   20051c:	48ee 0080 fffc 	moveml %d7,%fp@(-4)
+
   200522:	1e2e 000b      	moveb %fp@(11),%d7
-  200526:	0c07 0030      	cmpib #0x30,%d7
+  200526:	0c07 0030      	cmpib #0x30,%d7		; '0'
   20052a:	6d14           	blts 0x200540
-  20052c:	0c07 0039      	cmpib #0x39,%d7
+  20052c:	0c07 0039      	cmpib #0x39,%d7		; '9'
   200530:	6e0e           	bgts 0x200540
-  200532:	1007           	moveb %d7,%d0
+  200532:	1007           	moveb %d7,%d0		; digit !!
   200534:	4880           	extw %d0
   200536:	48c0           	extl %d0
   200538:	0480 0000 0030 	subil #0x30,%d0
   20053e:	6036           	bras 0x200576
-  200540:	0c07 0061      	cmpib #0x61,%d7
+
+  200540:	0c07 0061      	cmpib #0x61,%d7		; 'a'
   200544:	6d14           	blts 0x20055a
-  200546:	0c07 0066      	cmpib #0x66,%d7
+  200546:	0c07 0066      	cmpib #0x66,%d7		; 'f'
   20054a:	6e0e           	bgts 0x20055a
-  20054c:	1007           	moveb %d7,%d0
+  20054c:	1007           	moveb %d7,%d0		; hex digit !!
   20054e:	4880           	extw %d0
   200550:	48c0           	extl %d0
   200552:	0480 0000 0057 	subil #0x57,%d0
   200558:	601c           	bras 0x200576
-  20055a:	0c07 0041      	cmpib #0x41,%d7
+
+  20055a:	0c07 0041      	cmpib #0x41,%d7		; 'A'
   20055e:	6d14           	blts 0x200574
-  200560:	0c07 0046      	cmpib #0x46,%d7
+  200560:	0c07 0046      	cmpib #0x46,%d7		; 'F'
   200564:	6e0e           	bgts 0x200574
-  200566:	1007           	moveb %d7,%d0
+  200566:	1007           	moveb %d7,%d0		; hex digit !!
   200568:	4880           	extw %d0
   20056a:	48c0           	extl %d0
   20056c:	0480 0000 0037 	subil #0x37,%d0
   200572:	6002           	bras 0x200576
-  200574:	70ff           	moveq #-1,%d0
+
+  200574:	70ff           	moveq #-1,%d0		; bad !
+
   200576:	4cee 0080 fffc 	moveml %fp@(-4),%d7
   20057c:	4e5e           	unlk %fp
   20057e:	4e75           	rts
+
   200580:	4e56 fffc      	linkw %fp,#-4
   200584:	48ee 0080 fffc 	moveml %d7,%fp@(-4)
   20058a:	4287           	clrl %d7
@@ -598,7 +688,7 @@
   200590:	4880           	extw %d0
   200592:	48c0           	extl %d0
   200594:	2f00           	movel %d0,%sp@-
-  200596:	6180           	bsrs 0x200518
+  200596:	6180           	bsrs 0x200518		; hex_digit
   200598:	588f           	addql #4,%sp
   20059a:	e980           	asll #4,%d0
   20059c:	2e00           	movel %d0,%d7
@@ -606,33 +696,39 @@
   2005a2:	4880           	extw %d0
   2005a4:	48c0           	extl %d0
   2005a6:	2f00           	movel %d0,%sp@-
-  2005a8:	6100 ff6e      	bsrw 0x200518
+  2005a8:	6100 ff6e      	bsrw 0x200518		; hex_digit
   2005ac:	588f           	addql #4,%sp
   2005ae:	8087           	orl %d7,%d0
   2005b0:	4cee 0080 fffc 	moveml %fp@(-4),%d7
   2005b6:	4e5e           	unlk %fp
   2005b8:	4e75           	rts
+
+; subroutine - read a hex value
   2005ba:	4e56 fff8      	linkw %fp,#-8
   2005be:	48ee 00c0 fff8 	moveml %d6-%d7,%fp@(-8)
-  2005c4:	4287           	clrl %d7
+
+  2005c4:	4287           	clrl %d7		; d7 = 0
   2005c6:	600c           	bras 0x2005d4
+
   2005c8:	2007           	movel %d7,%d0
   2005ca:	e980           	asll #4,%d0
-  2005cc:	8086           	orl %d6,%d0
+  2005cc:	8086           	orl %d6,%d0		; d7 = d7<<4 + d6
   2005ce:	2e00           	movel %d0,%d7
   2005d0:	6100 fe48      	bsrw 0x20041a
-  2005d4:	6100 fe76      	bsrw 0x20044c
+  2005d4:	6100 fe76      	bsrw 0x20044c		; get character
   2005d8:	4880           	extw %d0
   2005da:	48c0           	extl %d0
   2005dc:	2f00           	movel %d0,%sp@-
-  2005de:	6100 ff38      	bsrw 0x200518
+  2005de:	6100 ff38      	bsrw 0x200518		; hex_digit
   2005e2:	588f           	addql #4,%sp
-  2005e4:	2c00           	movel %d0,%d6
+  2005e4:	2c00           	movel %d0,%d6		; d6 = digit_value
   2005e6:	6ce0           	bges 0x2005c8
   2005e8:	2007           	movel %d7,%d0
+
   2005ea:	4cee 00c0 fff8 	moveml %fp@(-8),%d6-%d7
   2005f0:	4e5e           	unlk %fp
   2005f2:	4e75           	rts
+
   2005f4:	4e56 fff0      	linkw %fp,#-16
   2005f8:	48ee 20e0 fff0 	moveml %d5-%d7/%a5,%fp@(-16)
   2005fe:	2e2e 0008      	movel %fp@(8),%d7
@@ -665,7 +761,7 @@
   200658:	4880           	extw %d0
   20065a:	48c0           	extl %d0
   20065c:	2f00           	movel %d0,%sp@-
-  20065e:	6100 feb8      	bsrw 0x200518
+  20065e:	6100 feb8      	bsrw 0x200518		; hex_digit
   200662:	588f           	addql #4,%sp
   200664:	4a80           	tstl %d0
   200666:	6d1c           	blts 0x200684
@@ -767,6 +863,8 @@
   20079a:	4cee 20e0 ffe4 	moveml %fp@(-28),%d5-%d7/%a5
   2007a0:	4e5e           	unlk %fp
   2007a2:	4e75           	rts
+
+; Handles 'A' monitor command (open address register)
   2007a4:	4e56 fffc      	linkw %fp,#-4
   2007a8:	48ee 0080 fffc 	moveml %d7,%fp@(-4)
   2007ae:	6100 fe0a      	bsrw 0x2005ba
@@ -802,7 +900,7 @@
   200818:	4880           	extw %d0
   20081a:	48c0           	extl %d0
   20081c:	2f00           	movel %d0,%sp@-
-  20081e:	6100 fcf8      	bsrw 0x200518
+  20081e:	6100 fcf8      	bsrw 0x200518		; hex_digit
   200822:	588f           	addql #4,%sp
   200824:	4a80           	tstl %d0
   200826:	6d1c           	blts 0x200844
@@ -819,6 +917,7 @@
   20084a:	4cee 0080 fffc 	moveml %fp@(-4),%d7
   200850:	4e5e           	unlk %fp
   200852:	4e75           	rts
+
   200854:	4e56 fffc      	linkw %fp,#-4
   200858:	48ee 2000 fffc 	moveml %a5,%fp@(-4)
   20085e:	2a7c 0000 0200 	moveal #0x200,%a5
@@ -831,7 +930,7 @@
   20087e:	6100 fbe2      	bsrw 0x200462		; puts
   200882:	588f           	addql #4,%sp
   200884:	42ad 0062      	clrl %a5@(98)
-  200888:	4eb9 0020 0ed2 	jsr 0x200ed2
+  200888:	4eb9 0020 0ed2 	jsr 0x200ed2		; getc
   20088e:	0c80 0000 005c 	cmpil #0x5c,%d0
   200894:	66f2           	bnes 0x200888
   200896:	2b7c 0000 0001 	movel #1,%a5@(134)
@@ -948,14 +1047,16 @@
   200a24:	202e fffc      	movel %fp@(-4),%d0
   200a28:	0c80 0000 0007 	cmpil #7,%d0
   200a2e:	6200 0118      	bhiw 0x200b48
+
   200a32:	d040           	addw %d0,%d0
-  200a34:	d040           	addw %d0,%d0
-  200a36:	207c 0020 1cd8 	moveal #0x201cd8,%a0
+  200a34:	d040           	addw %d0,%d0		; d0*4
+  200a36:	207c 0020 1cd8 	moveal #0x201cd8,%a0	; jump table
   200a3c:	2070 0000      	moveal %a0@(,%d0:w),%a0
   200a40:	4ed0           	jmp %a0@
 
-; If we ever did run this, we would print the monitor greeting.
-;
+; The following routine is the first entry in the jump table
+; being accessed just above.
+
 ; 0x201e40 is the line "PM68k Monitor, Version 1.2 - "
 
   200a42:	2f3c 0020 1e40 	movel #0x201e40,%sp@-
@@ -973,15 +1074,20 @@
   200a70:	1b7c 001e 0080 	moveb #0x1e,%a5@(128)
   200a76:	6000 00f6      	braw 0x200b6e
 
+; table entry 2
   200a7a:	2f3c 0020 1d9b 	movel #0x201d9b,%sp@-
   200a80:	6100 f9e0      	bsrw 0x200462		; puts
   200a84:	588f           	addql #4,%sp
   200a86:	6000 0094      	braw 0x200b1c
+
+; table entry 3
   200a8a:	486e 0050      	pea %fp@(80)
   200a8e:	6100 fe9e      	bsrw 0x20092e
   200a92:	588f           	addql #4,%sp
   200a94:	6000 00d8      	braw 0x200b6e
-  200a98:	6000 00d4      	braw 0x200b6e
+  200a98:	6000 00d4      	braw 0x200b6e		; just to be sure ?
+
+; table entry 5
   200a9c:	4aad 0070      	tstl %a5@(112)
   200aa0:	6722           	beqs 0x200ac4
   200aa2:	02ae ffff 7fff 	andil #0xffff7ffff,%fp@(76)
@@ -990,40 +1096,53 @@
   200aae:	206d 006c      	moveal %a5@(108),%a0
   200ab2:	3010           	movew %a0@,%d0
   200ab4:	b06d 006a      	cmpw %a5@(106),%d0
-  200ab8:	6600 0350      	bnew 0x200e0a
+  200ab8:	6600 0350      	bnew 0x200e0a		; return
   200abc:	30bc 4e41      	movew #0x4e41,%a0@
-  200ac0:	6000 0348      	braw 0x200e0a
+  200ac0:	6000 0348      	braw 0x200e0a		; return
   200ac4:	2f3c 0020 1da2 	movel #0x201da2,%sp@-
   200aca:	60b4           	bras 0x200a80
+
+; table entry 6
   200acc:	2f2e 0048      	movel %fp@(72),%sp@-
   200ad0:	2f2e 004c      	movel %fp@(76),%sp@-
   200ad4:	486e 0050      	pea %fp@(80)
   200ad8:	4eb9 0020 0fc8 	jsr 0x200fc8
   200ade:	dffc 0000 000c 	addal #0xc,%sp
   200ae4:	2d40 0008      	movel %d0,%fp@(8)
-  200ae8:	6000 0320      	braw 0x200e0a
-  200aec:	2f3c 0020 1dae 	movel #0x201dae,%sp@-
+  200ae8:	6000 0320      	braw 0x200e0a		; return
+
+; table entry 7
+  200aec:	2f3c 0020 1dae 	movel #0x201dae,%sp@-	; "Bus"
   200af2:	6006           	bras 0x200afa
-  200af4:	2f3c 0020 1db2 	movel #0x201db2,%sp@-
+
+; table entry 8
+  200af4:	2f3c 0020 1db2 	movel #0x201db2,%sp@-	; "Address"
   200afa:	6100 f966      	bsrw 0x200462		; puts
   200afe:	588f           	addql #4,%sp
-  200b00:	2f3c 0020 1dba 	movel #0x201dba,%sp@-
+
+  200b00:	2f3c 0020 1dba 	movel #0x201dba,%sp@-	; "Error, addr: "
   200b06:	6100 f95a      	bsrw 0x200462		; puts
   200b0a:	588f           	addql #4,%sp
+
   200b0c:	2f3c 0000 0008 	movel #8,%sp@-
   200b12:	2f2d 0002      	movel %a5@(2),%sp@-
   200b16:	6100 f978      	bsrw 0x200490
   200b1a:	508f           	addql #8,%sp
-  200b1c:	2f3c 0020 1dc9 	movel #0x201dc9,%sp@-
+
+  200b1c:	2f3c 0020 1dc9 	movel #0x201dc9,%sp@-	; " at "
   200b22:	6100 f93e      	bsrw 0x200462		; puts
   200b26:	588f           	addql #4,%sp
+
   200b28:	2f3c 0000 0006 	movel #6,%sp@-
   200b2e:	2f2e 0050      	movel %fp@(80),%sp@-
   200b32:	6100 f95c      	bsrw 0x200490
   200b36:	508f           	addql #8,%sp
-  200b38:	2f3c 0000 000a 	movel #0xa,%sp@-
+
+  200b38:	2f3c 0000 000a 	movel #0xa,%sp@-	; '\n'
   200b3e:	4eb9 0020 0e78 	jsr 0x200e78		; putc
   200b44:	6000 ff4c      	braw 0x200a92
+
+; ------- branch here from agove
   200b48:	202e 004c      	movel %fp@(76),%d0
   200b4c:	0280 ffff 0000 	andil #0xffff0000,%d0
   200b52:	2d40 fffc      	movel %d0,%fp@(-4)
@@ -1034,11 +1153,18 @@
   200b66:	6100 f8fa      	bsrw 0x200462		; puts
   200b6a:	588f           	addql #4,%sp
   200b6c:	60ca           	bras 0x200b38
+
+; table entry 4 (and other branches from above)
   200b6e:	02ae 0000 ffff 	andil #0xffff,%fp@(76)
   200b74:	004c
-  200b76:	2f3c 0020 1ddb 	movel #0x201ddb,%sp@-
+
+; individual handlers come here when done.
+; (so we loop to here)
+
+  200b76:	2f3c 0020 1ddb 	movel #0x201ddb,%sp@-	; ">"
   200b7c:	6100 f8e4      	bsrw 0x200462		; puts
   200b80:	588f           	addql #4,%sp
+
   200b82:	6100 f808      	bsrw 0x20038c
   200b86:	6100 f892      	bsrw 0x20041a
   200b8a:	1e00           	moveb %d0,%d7
@@ -1053,34 +1179,40 @@
   200ba2:	1007           	moveb %d7,%d0
   200ba4:	4880           	extw %d0
   200ba6:	48c0           	extl %d0
-  200ba8:	0280 0000 005f 	andil #0x5f,%d0
-  200bae:	0480 0000 0041 	subil #0x41,%d0
+  200ba8:	0280 0000 005f 	andil #0x5f,%d0		; force upper
+  200bae:	0480 0000 0041 	subil #0x41,%d0		; 'A'
   200bb4:	0c80 0000 0017 	cmpil #0x17,%d0
-  200bba:	6200 023c      	bhiw 0x200df8
+  200bba:	6200 023c      	bhiw 0x200df8		; "What?"
+
   200bbe:	d040           	addw %d0,%d0
-  200bc0:	d040           	addw %d0,%d0
-  200bc2:	207c 0020 1cf8 	moveal #0x201cf8,%a0
+  200bc0:	d040           	addw %d0,%d0		; d0 * 4
+  200bc2:	207c 0020 1cf8 	moveal #0x201cf8,%a0	; jump table
   200bc8:	2070 0000      	moveal %a0@(,%d0:w),%a0
   200bcc:	4ed0           	jmp %a0@
+
   200bce:	6100 f84a      	bsrw 0x20041a
   200bd2:	60c0           	bras 0x200b94
+
+; handler for 'A' (open address register)
   200bd4:	486e 0008      	pea %fp@(8)
   200bd8:	2f3c 0000 0008 	movel #8,%sp@-
   200bde:	6100 fbc4      	bsrw 0x2007a4
   200be2:	508f           	addql #8,%sp
   200be4:	6090           	bras 0x200b76
+
+; handler for 'B'
   200be6:	6100 fcc0      	bsrw 0x2008a8
   200bea:	608a           	bras 0x200b76
   200bec:	6100 f9cc      	bsrw 0x2005ba
   200bf0:	2c00           	movel %d0,%d6
   200bf2:	6708           	beqs 0x200bfc
   200bf4:	2d46 0050      	movel %d6,%fp@(80)
-  200bf8:	6000 0210      	braw 0x200e0a
+  200bf8:	6000 0210      	braw 0x200e0a		; return
   200bfc:	4aad 0070      	tstl %a5@(112)
-  200c00:	6700 0208      	beqw 0x200e0a
+  200c00:	6700 0208      	beqw 0x200e0a		; return
   200c04:	00ae 0000 8000 	oril #0x8000,%fp@(76)
   200c0a:	004c
-  200c0c:	6000 01fc      	braw 0x200e0a
+  200c0c:	6000 01fc      	braw 0x200e0a		; return
   200c10:	486e 0008      	pea %fp@(8)
   200c14:	2f3c 0000 0000 	movel #0,%sp@-
   200c1a:	60c2           	bras 0x200bde
@@ -1106,6 +1238,8 @@
   200c62:	588f           	addql #4,%sp
   200c64:	2d40 0050      	movel %d0,%fp@(80)
   200c68:	6000 ff0c      	braw 0x200b76
+
+; handler for 'G'
   200c6c:	6100 f94c      	bsrw 0x2005ba
   200c70:	2d40 fff8      	movel %d0,%fp@(-8)
   200c74:	6606           	bnes 0x200c7c
@@ -1113,8 +1247,12 @@
   200c7c:	206e fff8      	moveal %fp@(-8),%a0
   200c80:	4e90           	jsr %a0@
   200c82:	6000 fef2      	braw 0x200b76
+
+; handler for 'H'
   200c86:	4eb9 0020 11b8 	jsr 0x2011b8
   200c8c:	6000 fee8      	braw 0x200b76
+
+; handler for 'I'
   200c90:	6100 f788      	bsrw 0x20041a
   200c94:	4880           	extw %d0
   200c96:	48c0           	extl %d0
@@ -1124,7 +1262,7 @@
   200ca4:	588f           	addql #4,%sp
   200ca6:	6000 fece      	braw 0x200b76
 
-; no reference
+; handler for 'K' (soft reset)
   200caa:	2e7c 0000 1000 	moveal #0x1000,%sp
   200cb0:	4ef9 0020 02fa 	jmp 0x2002fa
 
@@ -1216,10 +1354,15 @@
   200dec:	6100 f62c      	bsrw 0x20041a
   200df0:	1b40 0080      	moveb %d0,%a5@(128)
   200df4:	6000 fd80      	braw 0x200b76
-  200df8:	2f3c 0020 1dee 	movel #0x201dee,%sp@-
+
+; handler for 'J' (no such command)
+  200df8:	2f3c 0020 1dee 	movel #0x201dee,%sp@-	; "What?\n"
   200dfe:	6100 f662      	bsrw 0x200462		; puts
   200e02:	6000 fea0      	braw 0x200ca4
+
+; no path ??
   200e06:	6000 fd6e      	braw 0x200b76
+; various places branch here
   200e0a:	4cee 20c0 ffec 	moveml %fp@(-20),%d6-%d7/%a5
   200e10:	4e5e           	unlk %fp
   200e12:	4e75           	rts
@@ -1289,23 +1432,35 @@
   200ece:	4e5e           	unlk %fp
   200ed0:	4e75           	rts
 
+; -----------------------------
+; subroutine to read a character from the serial console
+; "getc"
+
   200ed2:	4e56 fff8      	linkw %fp,#-8
   200ed6:	48ee 2080 fff8 	moveml %d7/%a5,%fp@(-8)
+
+; location 0x282 tells us which port we are using.
+; if it is zero, we are using port A
+; if it is 4, we are using porb B
   200edc:	2039 0000 0282 	movel 0x282,%d0
   200ee2:	0680 0060 0002 	addil #0x600002,%d0	; port A status
   200ee8:	2a40           	moveal %d0,%a5
+
+; poll
   200eea:	1015           	moveb %a5@,%d0
   200eec:	4880           	extw %d0
   200eee:	48c0           	extl %d0
   200ef0:	0280 0000 0001 	andil #1,%d0
   200ef6:	67f2           	beqs 0x200eea
+
   200ef8:	558d           	subql #2,%a5
   200efa:	1015           	moveb %a5@,%d0
   200efc:	4880           	extw %d0
   200efe:	48c0           	extl %d0
   200f00:	0280 0000 007f 	andil #0x7f,%d0
   200f06:	1e00           	moveb %d0,%d7
-  200f08:	4ab9 0000 0286 	tstl 0x286
+
+  200f08:	4ab9 0000 0286 	tstl 0x286		; do we echo?
   200f0e:	670e           	beqs 0x200f1e
   200f10:	1007           	moveb %d7,%d0
   200f12:	4880           	extw %d0
@@ -1313,6 +1468,7 @@
   200f16:	2f00           	movel %d0,%sp@-
   200f18:	6100 ff5e      	bsrw 0x200e78		; putc
   200f1c:	588f           	addql #4,%sp
+
   200f1e:	1007           	moveb %d7,%d0
   200f20:	4cee 2080 fff8 	moveml %fp@(-8),%d7/%a5
   200f26:	4e5e           	unlk %fp
@@ -1409,7 +1565,7 @@
   201044:	6000 009c      	braw 0x2010e2
   201048:	7009           	moveq #9,%d0
   20104a:	6000 0096      	braw 0x2010e2
-  20104e:	4eb9 0020 0ed2 	jsr 0x200ed2
+  20104e:	4eb9 0020 0ed2 	jsr 0x200ed2		; getc
   201054:	6000 008c      	braw 0x2010e2
   201058:	2745 0086      	movel %d5,%a3@(134)
   20105c:	4280           	clrl %d0
@@ -1463,23 +1619,47 @@
   2010e8:	4e5e           	unlk %fp
   2010ea:	4e75           	rts
 
-; subroutine
+; =============================================
+; subroutine.  One call at startup.
+; 
+; This probes to discover how much onboard RAM we have
+; returning the page count in d0.
+; It also modifies the page map.
+
+; pages are 2048 bytes, which is 2^11
+
   2010ec:	4e56 fff0      	linkw %fp,#-16
   2010f0:	48ee 00e4 fff0 	moveml %d2/%d5-%d7,%fp@(-16)
-  2010f6:	2c3c 0000 0400 	movel #0x400,%d6
+
+; start at the end of the address space.
+; This scans backwards through a 2M address space.
+; The Callan CPU board says it can have 128K or 256K,
+;   extendable to 512K -- so this scan allows for some possible
+;   future expansion.
+;
+; work back 16 pages at a time, writing page number
+; to addr + 0x700
+
+  2010f6:	2c3c 0000 0400 	movel #0x400,%d6	; 0x400 = 1024
+
   2010fc:	2006           	movel %d6,%d0
   2010fe:	720b           	moveq #0xb,%d1
-  201100:	e3a0           	asll %d1,%d0
+  201100:	e3a0           	asll %d1,%d0		; d0 = d6 << 11
   201102:	2040           	moveal %d0,%a0
   201104:	2146 0700      	movel %d6,%a0@(1792)
   201108:	0486 0000 0010 	subil #0x10,%d6
   20110e:	4a86           	tstl %d6
   201110:	6cea           	bges 0x2010fc
+
+; now work forward from 0 checking the page number
+; this will discover the end of memory
+
   201112:	4286           	clrl %d6
   201114:	6016           	bras 0x20112c
+
   201116:	2006           	movel %d6,%d0
   201118:	720b           	moveq #0xb,%d1
-  20111a:	e3a0           	asll %d1,%d0
+  20111a:	e3a0           	asll %d1,%d0		; d0 = d6 << 11
   20111c:	2040           	moveal %d0,%a0
   20111e:	2028 0700      	movel %a0@(1792),%d0
   201122:	b086           	cmpl %d6,%d0
@@ -1487,45 +1667,58 @@
   201126:	0686 0000 0010 	addil #0x10,%d6
   20112c:	0c86 0000 0400 	cmpil #0x400,%d6
   201132:	6de2           	blts 0x201116
+
+; d6 points to page after end of memory
+;  (note that we preserve d6 and return it)
+; this sets the page map to 0x1000 for all the pages
+; after the end of memory.
+
   201134:	2e06           	movel %d6,%d7
   201136:	6014           	bras 0x20114c
+
   201138:	2007           	movel %d7,%d0
   20113a:	720b           	moveq #0xb,%d1
-  20113c:	e3a0           	asll %d1,%d0
+  20113c:	e3a0           	asll %d1,%d0		; d0 = d7 << 11
   20113e:	0680 00a0 0000 	addil #0xa00000,%d0	; page map
   201144:	2040           	moveal %d0,%a0
   201146:	30bc 1000      	movew #0x1000,%a0@
   20114a:	5287           	addql #1,%d7
   20114c:	0c87 0000 0400 	cmpil #0x400,%d7
   201152:	6de4           	blts 0x201138
+
+; now loop forward
   201154:	4285           	clrl %d5
   201156:	6020           	bras 0x201178
+
   201158:	2005           	movel %d5,%d0
-  20115a:	0080 0000 2000 	oril #0x2000,%d0
+  20115a:	0080 0000 2000 	oril #0x2000,%d0	; d0 = d5 | 0x2000
   201160:	2205           	movel %d5,%d1
   201162:	0681 0000 0200 	addil #0x200,%d1
   201168:	740b           	moveq #0xb,%d2
-  20116a:	e5a1           	asll %d2,%d1
+  20116a:	e5a1           	asll %d2,%d1		; d1 = (d5+0x200)<<11
   20116c:	0681 00a0 0000 	addil #0xa00000,%d1	; page map
   201172:	2041           	moveal %d1,%a0
   201174:	3080           	movew %d0,%a0@
   201176:	5285           	addql #1,%d5
   201178:	0c85 0000 01e0 	cmpil #0x1e0,%d5
   20117e:	6dd8           	blts 0x201158
+
   201180:	4285           	clrl %d5
   201182:	6020           	bras 0x2011a4
+
   201184:	2005           	movel %d5,%d0
-  201186:	0080 0000 3000 	oril #0x3000,%d0
+  201186:	0080 0000 3000 	oril #0x3000,%d0	; d0 = d5 | 0x3000
   20118c:	2205           	movel %d5,%d1
   20118e:	0681 0000 03e0 	addil #0x3e0,%d1
   201194:	740b           	moveq #0xb,%d2
-  201196:	e5a1           	asll %d2,%d1
+  201196:	e5a1           	asll %d2,%d1		; d1 = (d5+0x3e0)<<11
   201198:	0681 00a0 0000 	addil #0xa00000,%d1	; page map
   20119e:	2041           	moveal %d1,%a0
   2011a0:	3080           	movew %d0,%a0@
   2011a2:	5285           	addql #1,%d5
   2011a4:	0c85 0000 0020 	cmpil #0x20,%d5
   2011aa:	6dd8           	blts 0x201184
+
   2011ac:	2006           	movel %d6,%d0
   2011ae:	4cee 00e4 fff0 	moveml %fp@(-16),%d2/%d5-%d7
   2011b4:	4e5e           	unlk %fp
@@ -2365,41 +2558,45 @@
   201cd4:	5043           	"PC"
   201cd6:	0000
 
-; big jump table
-  201cd8:	0020 0a42
-  201cdc:	0020 0a7a
-  201ce0:	0020 0a8a
-  201ce4:	0020 0b6e
-  201ce8:	0020 0a9c
-  201cec:	0020 0acc
-  201cf0:	0020 0aec
-  201cf4:	0020 0af4
-  201cf8:	0020 0bd4
-  201cfc:	0020 0be6
-  201d00:	0020 0bec
-  201d04:	0020 0c10
-  201d08:	0020 0c1c
-  201d0c:	0020 0c4e
-  201d10:	0020 0c6c
-  201d14:	0020 0c86
-  201d18:	0020 0c90
-  201d1c:	0020 0df8
-  201d20:	0020 0caa
-  201d24:	0020 0cb6
-  201d28:	0020 0cbe
-  201d2c:	0020 0d14
-  201d30:	0020 0d3c
-  201d34:	0020 0d6e
-  201d38:	0020 0df8
-  201d3c:	0020 0dc4
-  201d40:	0020 0dd2
-  201d44:	0020 0df8
-  201d48:	0020 0df8
-  201d4c:	0020 0df8
-  201d50:	0020 0df8
-  201d54:	0020 0dec
-  201d58:	0820 0800
+; Jump table
+  201cd8:	00200a42
+  201cdc:	00200a7a
+  201ce0:	00200a8a
+  201ce4:	00200b6e
+  201ce8:	00200a9c
+  201cec:	00200acc
+  201cf0:	00200aec
+  201cf4:	00200af4
 
+; Jump table indexed by letter 
+; This is how monitor commands are handled
+  201cf8:	00200bd4	; 'A'
+  201cfc:	00200be6	; 'B'
+  201d00:	00200bec
+  201d04:	00200c10
+  201d08:	00200c1c
+  201d0c:	00200c4e
+  201d10:	00200c6c	; 'G'
+  201d14:	00200c86	; 'H'
+  201d18:	00200c90	; 'I'
+  201d1c:	00200df8	; 'J' What?
+  201d20:	00200caa	; 'K'
+  201d24:	00200cb6
+  201d28:	00200cbe
+  201d2c:	00200d14
+  201d30:	00200d3c
+  201d34:	00200d6e
+  201d38:	00200df8	; What?
+  201d3c:	00200dc4
+  201d40:	00200dd2
+  201d44:	00200df8	; What?
+  201d48:	00200df8	; What?
+  201d4c:	00200df8	; What?
+  201d50:	00200df8	; What?
+  201d54:	00200dec
+  201d58:	08200800
+
+; The following looks like strings.
   201d5c:	3f20           	movew %a0@-,%sp@-
   201d5e:	003a           	.short 0x003a
   201d60:	2000           	movel %d0,%d0
@@ -2463,17 +2660,17 @@
   201df2:	3f0a           	movew %a2,%sp@-
   201df4:	0000 0000      	orib #0,%d0
 
-; this looks like data
-  201df8:	0020 10ca      	orib #0x36,%a0@-
-  201dfc:	0020 10c4      	orib #0x3c,%a0@-
-  201e00:	0020 1090      	orib #0x70,%a0@-
-  201e04:	0020 1062      	orib #0x62,%a0@-
-  201e08:	0020 10d8      	orib #0x28,%a0@-
-  201e0c:	0020 103a      	orib #0x3a,%a0@-
-  201e10:	0020 1048      	orib #0x48,%a0@-
-  201e14:	0020 104e      	orib #0x4e,%a0@-
-  201e18:	0020 10d2      	orib #0x2e,%a0@-
-  201e1c:	0020 1058      	orib #0x58,%a0@-
+; this looks like another jump table
+  201df8:	002010ca      	orib #0x36,%a0@-
+  201dfc:	002010c4      	orib #0x3c,%a0@-
+  201e00:	00201090      	orib #0x70,%a0@-
+  201e04:	00201062      	orib #0x62,%a0@-
+  201e08:	002010d8      	orib #0x28,%a0@-
+  201e0c:	0020103a      	orib #0x3a,%a0@-
+  201e10:	00201048      	orib #0x48,%a0@-
+  201e14:	0020104e      	orib #0x4e,%a0@-
+  201e18:	002010d2      	orib #0x2e,%a0@-
+  201e1c:	00201058      	orib #0x58,%a0@-
 
 ; uart initialization table
   201e20:	1818           	moveb %a0@+,%d4
@@ -2544,7 +2741,12 @@
   201ec2:	4eb9 0040 0000 	jsr 0x400000		; call extension ROM
   201ec8:	4e75           	rts
 
-  201eca:	4eb9 0020 0ed2 	jsr 0x200ed2
+; No extension ROM
+; spin here until we read a character
+; (I don't think we will actually spin here.
+;  we will spin in getc until we read a character,
+;  which is unlikely to have a zero value.)
+  201eca:	4eb9 0020 0ed2 	jsr 0x200ed2		; getc
   201ed0:	4a00           	tstb %d0
   201ed2:	67f6           	beqs 0x201eca
   201ed4:	4e75           	rts

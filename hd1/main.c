@@ -14,7 +14,9 @@
 typedef volatile unsigned short vu_short;
 typedef volatile unsigned char vu_char;
 
-#ifdef notdef
+static char buf[32];
+
+/* Yields an 0.35 second delay */
 void
 delay_x ( void )
 {
@@ -24,7 +26,28 @@ delay_x ( void )
 	while ( count-- )
 	    ;
 }
-#endif
+
+/* This should be about 1 second */
+void
+delay_one ( void )
+{
+	volatile unsigned int count;
+	
+	count = 142857;
+	while ( count-- )
+	    ;
+}
+
+void
+delay_ms ( int ms )
+{
+	volatile unsigned int count;
+
+	count = 143 * ms;
+	
+	while ( count-- )
+	    ;
+}
 
 int bss_rubbish[4];
 
@@ -42,9 +65,11 @@ start ( void )
 	hd_init ();
 
 	printf ( "Starting HD test\n" );
+	// dump_buf ( buf, 32 );
 
 	hd_test ();
 
+	// dump_buf ( buf, 32 );
 	printf ( " -- Done\n" );
 }
 
