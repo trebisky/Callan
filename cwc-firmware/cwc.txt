@@ -1,0 +1,2109 @@
+# The CWC handles the IV bus in its own unique way.
+# Other systems I have looked at have 8x300 family chips
+# that support a 2 step process.
+# First you select the device by sending the device address using an XMIT to ivr or ivl
+# Then you send (or receive) data from the device by a subsequent access to driv or sriv
+# The Callan uses the extra ROM to select devices, which immediately respond to
+# what is placed on the IV bus.
+
+0000: e0 40 [0 w-0 r-0 (00)]          jmp     x0040
+
+0001: c6 17 [0 w-0 r-0 (00)]          xmit    17h,r6
+0002: e0 52 [0 w-0 r-0 (00)]          jmp     x0052
+
+0003: a6 05 [0 w-0 r-0 (00)]  x0003:  nzt     r6,x0005
+0004: e6 b0 [0 w-0 r-0 (00)]          jmp     x06b0
+
+0005: c0 21 [0 w-0 r-0 (00)]  x0005:  xmit    21h,aux
+0006: 66 09 [0 w-0 r-0 (00)]          xor     r6,r11
+0007: a9 0b [0 w-0 r-0 (00)]          nzt     r11,x000b
+0008: c7 43 [0 w-b r-0 (58)]          xmit    43h,ivl
+0009: 17 09 [1 w-0 r-2 (82)]          move    sliv,r11
+000a: a9 0e [0 w-0 r-0 (00)]          nzt     r11,x000e
+000b: c7 c8 [0 w-b r-0 (58)]  x000b:  xmit    0c8h,ivl
+000c: c7 48 [0 w-2 r-0 (10)]          xmit    48h,ivl
+000d: e7 e3 [0 w-0 r-0 (00)]          jmp     x07e3
+000e: e6 b0 [0 w-0 r-0 (00)]  x000e:  jmp     x06b0
+
+; This looks like some kind of data table.
+; all 3 roms have identical contents
+000f: 03 03 [0 w-0 r-3 (03)]          move    r3,r3
+0010: 00 00 [0 w-0 r-0 (00)]          nop     
+0011: ff ff [1 w-f r-7 (ff)]          jmp     x1fff
+0012: 80 80 [1 w-0 r-0 (80)]          xec     x0080,aux
+0013: 7f 7f [0 w-f r-7 (7f)]          xor     sriv[2:0],driv[2:0]
+0014: 80 80 [1 w-0 r-0 (80)]          xec     x0080,aux
+0015: df df [1 w-b r-7 (df)]          xmit    1fh,driv[5:0]
+0016: 40 40 [0 w-8 r-0 (40)]          and     aux>>>2,aux
+0017: 8f 8f [1 w-1 r-7 (8f)]          xec     x008f,ivr
+0018: 20 20 [0 w-4 r-0 (20)]          add     aux>>>1,aux
+0019: 2f 2f [0 w-5 r-7 (2f)]          add     ivr>>>1,ivr
+001a: 10 10 [0 w-2 r-0 (10)]          move    sliv[14:7],dliv[14:7]
+001b: e3 e3 [1 w-c r-3 (e3)]          jmp     x03e3
+
+; monster jump table
+001c: 09 49 [0 w-0 r-0 (00)]  x001c:  move    r11>>>2,r11
+001d: c0 3f [0 w-0 r-0 (00)]          xmit    3fh,aux
+001e: 49 09 [0 w-0 r-0 (00)]          and     r11,r11
+001f: 89 20 [0 w-0 r-0 (00)]          xec     x0020,r11
+
+; 22 commands are defined for the CWC
+
+0020: e5 0e [0 w-0 r-0 (00)]  x0020:  jmp     x050e		; 0
+0021: e5 1b [0 w-0 r-0 (00)]          jmp     x051b
+0022: e5 47 [0 w-0 r-0 (00)]          jmp     x0547
+0023: af af [1 w-5 r-7 (af)]          nzt     ivr,x00af
+0024: e0 a3 [0 w-0 r-0 (00)]          jmp     x00a3
+0025: e0 d2 [0 w-0 r-0 (00)]          jmp     x00d2
+0026: e1 0d [0 w-0 r-0 (00)]          jmp     x010d
+0027: e2 ce [0 w-0 r-0 (00)]          jmp     x02ce
+0028: e2 d2 [0 w-0 r-0 (00)]          jmp     x02d2
+0029: e7 f9 [0 w-0 r-0 (00)]          jmp     x07f9
+002a: e6 49 [0 w-0 r-0 (00)]          jmp     x0649
+002b: e6 8e [0 w-0 r-0 (00)]          jmp     x068e
+002c: e6 93 [0 w-0 r-0 (00)]          jmp     x0693
+002d: e6 97 [0 w-0 r-0 (00)]          jmp     x0697
+002e: e6 9a [0 w-0 r-0 (00)]          jmp     x069a
+002f: e6 9f [0 w-0 r-0 (00)]          jmp     x069f
+0030: e6 a4 [0 w-0 r-0 (00)]          jmp     x06a4
+0031: e0 03 [0 w-0 r-0 (00)]          jmp     x0003
+0032: e6 a9 [0 w-0 r-0 (00)]          jmp     x06a9
+0033: e6 b4 [0 w-0 r-0 (00)]          jmp     x06b4
+0034: e6 b9 [0 w-0 r-0 (00)]          jmp     x06b9
+0035: e6 f6 [0 w-0 r-0 (00)]          jmp     x06f6		; 21
+0036: e7 f6 [0 w-0 r-0 (00)]          jmp     x07f6
+0037: e7 6b [0 w-0 r-0 (00)]          jmp     x076b
+0038: e6 59 [0 w-0 r-0 (00)]          jmp     x0659
+0039: e6 c3 [0 w-0 r-0 (00)]          jmp     x06c3
+003a: e6 2f [0 w-0 r-0 (00)]          jmp     x062f
+003b: e6 ef [0 w-0 r-0 (00)]  x003b:  jmp     x06ef
+
+; more data follows (fill to 32 entries)
+003c: 48 48 [0 w-9 r-0 (48)]          dw      4848h
+003d: 83 83 [1 w-0 r-3 (83)]          xec     x0083,r3
+003e: 9b 9b [1 w-3 r-3 (9b)]          xec     x003b,sriv[7:4]
+003f: 83 83 [1 w-0 r-3 (83)]          xec     x0083,r3		; 31
+
+; *********************
+; execution starts here
+; *********************
+
+0040: c7 3e [0 w-0 r-0 (00)]  x0040:  xmit    3eh,ivl	; ---
+0041: c7 80 [0 w-4 r-0 (20)]          xmit    80h,ivl	; LRAMAH
+0042: c7 20 [0 w-d r-0 (68)]          xmit    20h,ivl	; PMBWR
+0043: c7 00 [0 w-e r-0 (70)]          xmit    0h,ivl	; PMBRD
+0044: c7 08 [0 w-c r-0 (60)]          xmit    8h,ivl	; LRBUSY
+0045: c7 00 [0 w-b r-0 (58)]          xmit    0h,ivl	; PTIMER
+
+; loop
+0046: c0 01 [0 w-0 r-0 (00)]          xmit    1h,aux
+0047: c1 00 [0 w-0 r-0 (00)]          xmit    0h,r1
+0048: 21 01 [0 w-0 r-0 (00)]  x0048:  add     r1,r1
+0049: c7 00 [0 w-2 r-0 (10)]          xmit    0h,ivl
+004a: a1 48 [0 w-0 r-0 (00)]          nzt     r1,x0048
+
+004b: c7 2c [0 w-b r-0 (58)]          xmit    2ch,ivl
+004c: c7 01 [0 w-2 r-0 (10)]          xmit    1h,ivl
+004d: c7 3c [0 w-0 r-0 (00)]          xmit    3ch,ivl
+004e: c7 00 [0 w-4 r-0 (20)]          xmit    0h,ivl
+004f: c7 30 [0 w-0 r-0 (00)]          xmit    30h,ivl
+0050: e0 54 [0 w-0 r-0 (00)]          jmp     x0054
+
+0051: bf bf [1 w-7 r-7 (bf)]          nzt     sriv[4:0],x005f
+0052: e0 b0 [0 w-0 r-0 (00)]  x0052:  jmp     x00b0
+0053: ff ff [1 w-f r-7 (ff)]          jmp     x1fff
+
+0054: c7 30 [0 w-0 r-0 (00)]  x0054:  xmit    30h,ivl
+0055: c7 1f [0 w-b r-0 (58)]          xmit    1fh,ivl
+0056: c7 00 [0 w-2 r-0 (10)]          xmit    0h,ivl
+0057: c7 00 [0 w-f r-0 (78)]          xmit    0h,ivl
+0058: c7 00 [0 w-e r-0 (70)]          xmit    0h,ivl
+
+0059: c0 07 [0 w-0 r-0 (00)]  x0059:  xmit    7h,aux
+005a: c7 08 [0 w-c r-0 (60)]          xmit    8h,ivl	; write to LRBUSY
+005b: c7 1f [0 w-b r-0 (58)]          xmit    1fh,ivl	; write to PTIMER
+005c: 17 06 [1 w-0 r-2 (82)]          move    sliv,r6	; read RRAM
+005d: c7 1f [0 w-b r-0 (58)]          xmit    1fh,ivl	; write to PTIMER
+
+; spin here waiting for a write to some multibus command port
+005e: b4 3e [0 w-0 r-1 (01)]  x005e:  nzt     sliv[3],x005e
+
+; read the port
+005f: 17 09 [0 w-0 r-1 (01)]  x005f:  move    sliv,r11
+
+; and with mask in aux (0x7) 3 bits
+0060: 49 09 [0 w-0 r-0 (00)]          and     r11,r11
+0061: 89 67 [0 w-0 r-0 (00)]          xec     x0067,r11
+
+0062: 06 07 [0 w-4 r-0 (20)]  x0062:  move    r6,ivl	; write to LRAMH
+0063: 06 07 [0 w-2 r-0 (10)]          move    r6,ivl	; write to LMBAH
+
+0064: b4 26 [0 w-0 r-1 (01)]  x0064:  nzt     sliv[3],x0066	; check CMD bit
+0065: e0 64 [0 w-0 r-0 (00)]          jmp     x0064	; clear, spin
+0066: e0 59 [0 w-0 r-0 (00)]  x0066:  jmp     x0059	; set, branch up
+
+; table for xec above
+; this looks upside down !!
+0067: e0 82 [0 w-0 r-0 (00)]  x0067:  jmp     x0082	; 0 -- clear interrupts
+0068: e0 73 [0 w-0 r-0 (00)]          jmp     x0073	; 1 -- config and go
+0069: 17 04 [0 w-0 r-4 (04)]          move    sliv,r4	; 2 -- read mbus data (bogus)
+006a: 17 03 [0 w-0 r-4 (04)]          move    sliv,r3	; 3 -- read mbus data
+006b: 17 04 [0 w-0 r-4 (04)]          move    sliv,r4	; 4 -- read mbus data (bogus)
+006c: 17 02 [0 w-0 r-4 (04)]          move    sliv,r2	; 5 -- read mbus data
+006d: 17 04 [0 w-0 r-4 (04)]          move    sliv,r4	; 6 -- read mbus data (bogus)
+006e: 17 01 [0 w-0 r-4 (04)]          move    sliv,r1	; 7 -- read mbus data
+
+; 4 way branch table driven by bits 0011_0000 in config and go
+006f: e0 86 [0 w-0 r-0 (00)]  x006f:  jmp     x0086	; 00
+0070: e0 7a [0 w-0 r-0 (00)]          jmp     x007a	; 01
+0071: e0 7c [0 w-0 r-0 (00)]          jmp     x007c	; 10
+0072: e0 7c [0 w-0 r-0 (00)]          jmp     x007c	; 11
+
+0073: 17 04 [0 w-0 r-4 (04)]  x0073:  move    sliv,r4	; read multibus data
+0074: 04 05 [0 w-0 r-0 (00)]          move    r4,r5
+0075: c0 30 [0 w-0 r-0 (00)]          xmit    30h,aux
+0076: 45 05 [0 w-0 r-0 (00)]          and     r5,r5	; r5 &= 0x30
+0077: 05 85 [0 w-0 r-0 (00)]          move    r5>>>4,r5	; r5 >>= 4
+0078: c7 00 [0 w-e r-0 (70)]          xmit    0h,ivl	; PMBRD
+0079: 85 6f [0 w-0 r-0 (00)]          xec     x006f,r5	; XEC table above
+
+007a: c6 00 [0 w-0 r-0 (00)]  x007a:  xmit    0h,r6
+007b: e0 62 [0 w-0 r-0 (00)]          jmp     x0062
+
+007c: c0 30 [0 w-0 r-0 (00)]  x007c:  xmit    30h,aux
+007d: 46 09 [0 w-0 r-0 (00)]          and     r6,r11
+007e: a9 62 [0 w-0 r-0 (00)]          nzt     r11,x0062
+007f: c0 3f [0 w-0 r-0 (00)]          xmit    3fh,aux
+0080: 44 06 [0 w-0 r-0 (00)]  x0080:  and     r4,r6
+0081: e0 62 [0 w-0 r-0 (00)]          jmp     x0062
+
+0082: c7 00 [0 w-e r-0 (70)]  x0082:  xmit    0h,ivl	; write to PMBWR
+0083: c0 bf [0 w-0 r-0 (00)]  x0083:  xmit    0bfh,aux
+0084: 46 06 [0 w-0 r-0 (00)]          and     r6,r6
+0085: e0 62 [0 w-0 r-0 (00)]          jmp     x0062
+
+; Command is one of 0-f
+0086: 04 09 [0 w-0 r-0 (00)]  x0086:  move    r4,r11
+0087: c0 0f [0 w-0 r-0 (00)]          xmit    0fh,aux
+0088: 44 04 [0 w-0 r-0 (00)]          and     r4,r4
+0089: c0 80 [0 w-0 r-0 (00)]          xmit    80h,aux
+008a: 24 04 [0 w-0 r-0 (00)]          add     r4,r4
+008b: 04 07 [0 w-2 r-0 (10)]          move    r4,ivl
+008c: 04 07 [0 w-4 r-0 (20)]          move    r4,ivl
+008d: c7 34 [0 w-0 r-0 (00)]          xmit    34h,ivl
+008e: c0 80 [0 w-0 r-0 (00)]          xmit    80h,aux
+008f: 49 06 [0 w-0 r-0 (00)]  x008f:  and     r11,r6
+0090: c7 32 [0 w-b r-0 (58)]          xmit    32h,ivl
+0091: 06 07 [0 w-2 r-0 (10)]          move    r6,ivl
+0092: c7 2c [0 w-b r-0 (58)]          xmit    2ch,ivl
+0093: c0 40 [0 w-0 r-0 (00)]          xmit    40h,aux
+0094: 49 06 [0 w-0 r-0 (00)]          and     r11,r6
+0095: a6 98 [0 w-0 r-0 (00)]          nzt     r6,x0098
+0096: c7 01 [0 w-2 r-0 (10)]          xmit    1h,ivl
+0097: e0 99 [0 w-0 r-0 (00)]          jmp     x0099
+0098: c7 00 [0 w-2 r-0 (10)]  x0098:  xmit    0h,ivl
+0099: c7 20 [0 w-b r-0 (58)]  x0099:  xmit    20h,ivl
+009a: c7 12 [0 w-2 r-0 (10)]          xmit    12h,ivl
+009b: c7 00 [0 w-2 r-0 (10)]          xmit    0h,ivl
+009c: c7 02 [0 w-2 r-0 (10)]          xmit    2h,ivl
+009d: c7 00 [0 w-2 r-0 (10)]          xmit    0h,ivl
+009e: 01 07 [0 w-2 r-0 (10)]          move    r1,ivl
+009f: 02 07 [0 w-2 r-0 (10)]          move    r2,ivl
+00a0: 03 07 [0 w-2 r-0 (10)]          move    r3,ivl
+00a1: c7 10 [0 w-2 r-0 (10)]          xmit    10h,ivl
+00a2: e1 f9 [0 w-0 r-0 (00)]          jmp     x01f9
+00a3: c7 08 [0 w-c r-0 (60)]  x00a3:  xmit    8h,ivl
+00a4: c7 28 [0 w-b r-0 (58)]          xmit    28h,ivl
+00a5: 17 01 [1 w-0 r-2 (82)]          move    sliv,r1
+00a6: a1 af [0 w-0 r-0 (00)]          nzt     r1,x00af
+00a7: c7 2b [0 w-b r-0 (58)]          xmit    2bh,ivl
+00a8: c7 00 [0 w-2 r-0 (10)]          xmit    0h,ivl
+00a9: c7 3c [0 w-b r-0 (58)]          xmit    3ch,ivl
+00aa: c7 00 [0 w-2 r-0 (10)]          xmit    0h,ivl
+00ab: c7 46 [0 w-b r-0 (58)]          xmit    46h,ivl
+00ac: c7 00 [0 w-2 r-0 (10)]          xmit    0h,ivl
+00ad: c7 00 [0 w-2 r-0 (10)]          xmit    0h,ivl
+00ae: e5 6e [0 w-0 r-0 (00)]          jmp     x056e
+00af: e0 d2 [0 w-0 r-0 (00)]  x00af:  jmp     x00d2
+00b0: c7 08 [0 w-c r-0 (60)]  x00b0:  xmit    8h,ivl
+00b1: c7 10 [0 w-b r-0 (58)]          xmit    10h,ivl
+00b2: 17 03 [1 w-0 r-2 (82)]          move    sliv,r3
+00b3: 17 01 [1 w-0 r-2 (82)]          move    sliv,r1
+00b4: 17 01 [1 w-0 r-2 (82)]          move    sliv,r1
+00b5: 17 02 [1 w-0 r-2 (82)]          move    sliv,r2
+00b6: a6 bf [0 w-0 r-0 (00)]          nzt     r6,x00bf
+00b7: c7 2b [0 w-b r-0 (58)]          xmit    2bh,ivl
+00b8: 17 00 [1 w-0 r-2 (82)]          move    sliv,aux
+00b9: 26 06 [0 w-0 r-0 (00)]          add     r6,r6
+00ba: c0 80 [0 w-0 r-0 (00)]          xmit    80h,aux
+00bb: 26 06 [0 w-0 r-0 (00)]          add     r6,r6
+00bc: c7 3c [0 w-b r-0 (58)]          xmit    3ch,ivl
+00bd: 17 00 [1 w-0 r-2 (82)]          move    sliv,aux
+00be: 26 06 [0 w-0 r-0 (00)]          add     r6,r6
+00bf: c7 40 [0 w-c r-0 (60)]  x00bf:  xmit    40h,ivl
+00c0: 17 09 [1 w-0 r-2 (82)]          move    sliv,r11
+00c1: c0 0f [0 w-0 r-0 (00)]          xmit    0fh,aux
+00c2: 49 09 [0 w-0 r-0 (00)]          and     r11,r11
+00c3: 69 09 [0 w-0 r-0 (00)]          xor     r11,r11
+00c4: c7 08 [0 w-c r-0 (60)]          xmit    8h,ivl
+00c5: c7 00 [0 w-b r-0 (58)]          xmit    0h,ivl
+00c6: 06 07 [0 w-2 r-0 (10)]          move    r6,ivl
+00c7: 09 07 [0 w-2 r-0 (10)]          move    r11,ivl
+00c8: c7 20 [0 w-b r-0 (58)]          xmit    20h,ivl
+00c9: c7 18 [0 w-2 r-0 (10)]          xmit    18h,ivl
+00ca: c7 00 [0 w-2 r-0 (10)]          xmit    0h,ivl
+00cb: c7 00 [0 w-2 r-0 (10)]          xmit    0h,ivl
+00cc: c7 00 [0 w-2 r-0 (10)]          xmit    0h,ivl
+00cd: 01 07 [0 w-2 r-0 (10)]          move    r1,ivl
+00ce: 02 07 [0 w-2 r-0 (10)]          move    r2,ivl
+00cf: 03 07 [0 w-2 r-0 (10)]          move    r3,ivl
+00d0: c7 14 [0 w-2 r-0 (10)]          xmit    14h,ivl
+00d1: e1 f7 [0 w-0 r-0 (00)]          jmp     x01f7
+00d2: c7 08 [0 w-c r-0 (60)]  x00d2:  xmit    8h,ivl
+00d3: c7 32 [0 w-b r-0 (58)]          xmit    32h,ivl
+00d4: 17 09 [1 w-0 r-2 (82)]          move    sliv,r11
+00d5: c7 1f [0 w-b r-0 (58)]          xmit    1fh,ivl
+00d6: 17 06 [1 w-0 r-2 (82)]          move    sliv,r6
+00d7: c0 7f [0 w-0 r-0 (00)]          xmit    7fh,aux
+00d8: 46 06 [0 w-0 r-0 (00)]          and     r6,r6
+00d9: c7 1f [0 w-b r-0 (58)]          xmit    1fh,ivl
+00da: a9 e0 [0 w-0 r-0 (00)]          nzt     r11,x00e0
+00db: 06 07 [0 w-2 r-0 (10)]          move    r6,ivl
+00dc: c7 30 [0 w-0 r-0 (00)]          xmit    30h,ivl
+00dd: 06 07 [0 w-4 r-0 (20)]          move    r6,ivl
+00de: c7 00 [0 w-e r-0 (70)]          xmit    0h,ivl
+00df: e0 59 [0 w-0 r-0 (00)]          jmp     x0059
+00e0: c0 40 [0 w-0 r-0 (00)]  x00e0:  xmit    40h,aux
+00e1: 26 06 [0 w-0 r-0 (00)]          add     r6,r6
+00e2: 06 07 [0 w-2 r-0 (10)]          move    r6,ivl
+00e3: c7 30 [0 w-0 r-0 (00)]          xmit    30h,ivl
+00e4: 06 07 [0 w-4 r-0 (20)]          move    r6,ivl
+00e5: c7 80 [0 w-e r-0 (70)]          xmit    80h,ivl
+00e6: e0 59 [0 w-0 r-0 (00)]          jmp     x0059
+00e7: 4b 4b [0 w-9 r-3 (4b)]          and     r13>>>2,r13
+00e8: c7 00 [0 w-3 r-0 (18)]  x00e8:  xmit    0h,ivl
+00e9: c7 03 [0 w-b r-0 (58)]          xmit    3h,ivl
+00ea: 17 01 [1 w-0 r-2 (82)]          move    sliv,r1
+00eb: c7 a1 [0 w-b r-0 (58)]          xmit    0a1h,ivl
+00ec: 17 03 [1 w-0 r-2 (82)]          move    sliv,r3
+00ed: 81 f6 [0 w-0 r-0 (00)]          xec     x00f6,r1
+00ee: 03 80 [0 w-0 r-0 (00)]          move    r3>>>4,aux
+00ef: 29 09 [0 w-0 r-0 (00)]          add     r11,r11
+00f0: 09 07 [0 w-e r-0 (70)]          move    r11,ivl
+00f1: c7 c0 [0 w-b r-0 (58)]          xmit    0c0h,ivl
+00f2: 17 09 [1 w-0 r-2 (82)]          move    sliv,r11
+00f3: b3 3a [0 w-0 r-3 (03)]          nzt     sliv[4],x00fa
+00f4: c6 41 [0 w-0 r-0 (00)]          xmit    41h,r6
+00f5: e0 fe [0 w-0 r-0 (00)]          jmp     x00fe
+00f6: c9 01 [0 w-0 r-0 (00)]  x00f6:  xmit    1h,r11
+00f7: c9 02 [0 w-0 r-0 (00)]          xmit    2h,r11
+00f8: c9 04 [0 w-0 r-0 (00)]          xmit    4h,r11
+00f9: c9 08 [0 w-0 r-0 (00)]          xmit    8h,r11
+00fa: b4 3d [0 w-0 r-5 (05)]  x00fa:  nzt     sliv[3],x00fd
+00fb: c6 00 [0 w-0 r-0 (00)]          xmit    0h,r6
+00fc: e0 fe [0 w-0 r-0 (00)]          jmp     x00fe
+00fd: c6 42 [0 w-0 r-0 (00)]  x00fd:  xmit    42h,r6
+00fe: c0 ff [0 w-0 r-0 (00)]  x00fe:  xmit    0ffh,aux
+00ff: c3 11 [0 w-0 r-0 (00)]          xmit    11h,r3
+0100: 23 03 [0 w-0 r-0 (00)]  x0100:  add     r3,r3
+0101: a3 00 [0 w-0 r-0 (00)]          nzt     r3,x0100
+0102: e0 1c [0 w-0 r-0 (00)]          jmp     x001c
+0103: ff ff [1 w-f r-7 (ff)]          jmp     x1fff
+0104: e1 08 [0 w-0 r-0 (00)]  x0104:  jmp     x0108
+0105: c7 40 [0 w-b r-0 (58)]  x0105:  xmit    40h,ivl
+0106: c7 02 [0 w-2 r-0 (10)]          xmit    2h,ivl
+0107: e1 0a [0 w-0 r-0 (00)]          jmp     x010a
+0108: c7 40 [0 w-b r-0 (58)]  x0108:  xmit    40h,ivl
+0109: c7 00 [0 w-2 r-0 (10)]          xmit    0h,ivl
+010a: c7 c0 [0 w-b r-0 (58)]  x010a:  xmit    0c0h,ivl
+010b: c7 18 [0 w-2 r-0 (10)]          xmit    18h,ivl
+010c: e0 e8 [0 w-0 r-0 (00)]          jmp     x00e8
+010d: a6 c8 [0 w-0 r-0 (00)]  x010d:  nzt     r6,x01c8
+010e: c7 40 [0 w-b r-0 (58)]          xmit    40h,ivl
+010f: 17 06 [1 w-0 r-2 (82)]          move    sliv,r6
+0110: a6 3d [0 w-0 r-0 (00)]          nzt     r6,x013d
+0111: c7 b1 [0 w-b r-0 (58)]          xmit    0b1h,ivl
+0112: 17 03 [1 w-0 r-2 (82)]          move    sliv,r3
+0113: c7 b3 [0 w-b r-0 (58)]          xmit    0b3h,ivl
+0114: 17 05 [1 w-0 r-2 (82)]          move    sliv,r5
+0115: 17 06 [1 w-0 r-2 (82)]          move    sliv,r6
+0116: 17 04 [1 w-0 r-2 (82)]          move    sliv,r4
+0117: c7 a2 [0 w-b r-0 (58)]          xmit    0a2h,ivl
+0118: 17 01 [1 w-0 r-2 (82)]          move    sliv,r1
+0119: 17 02 [1 w-0 r-2 (82)]          move    sliv,r2
+011a: a4 22 [0 w-0 r-0 (00)]          nzt     r4,x0122
+011b: c7 40 [0 w-b r-0 (58)]          xmit    40h,ivl
+011c: 17 04 [1 w-0 r-2 (82)]          move    sliv,r4
+011d: c0 01 [0 w-0 r-0 (00)]          xmit    1h,aux
+011e: 24 04 [0 w-0 r-0 (00)]          add     r4,r4
+011f: c7 40 [0 w-b r-0 (58)]          xmit    40h,ivl
+0120: 04 07 [0 w-2 r-0 (10)]          move    r4,ivl
+0121: e1 3d [0 w-0 r-0 (00)]          jmp     x013d
+0122: c0 ff [0 w-0 r-0 (00)]  x0122:  xmit    0ffh,aux
+0123: 65 05 [0 w-0 r-0 (00)]          xor     r5,r5
+0124: 66 06 [0 w-0 r-0 (00)]          xor     r6,r6
+0125: 05 00 [0 w-0 r-0 (00)]          move    r5,aux
+0126: 21 01 [0 w-0 r-0 (00)]          add     r1,r1
+0127: a8 29 [0 w-0 r-0 (00)]          nzt     ovf,x0129
+0128: e1 2b [0 w-0 r-0 (00)]          jmp     x012b
+0129: c0 01 [0 w-0 r-0 (00)]  x0129:  xmit    1h,aux
+012a: 22 02 [0 w-0 r-0 (00)]          add     r2,r2
+012b: 06 00 [0 w-0 r-0 (00)]  x012b:  move    r6,aux
+012c: 22 02 [0 w-0 r-0 (00)]          add     r2,r2
+012d: a8 33 [0 w-0 r-0 (00)]          nzt     ovf,x0133
+012e: c0 ff [0 w-0 r-0 (00)]          xmit    0ffh,aux
+012f: 61 01 [0 w-0 r-0 (00)]          xor     r1,r1
+0130: 62 02 [0 w-0 r-0 (00)]          xor     r2,r2
+0131: c4 20 [0 w-0 r-0 (00)]          xmit    20h,r4
+0132: e1 38 [0 w-0 r-0 (00)]          jmp     x0138
+0133: c0 01 [0 w-0 r-0 (00)]  x0133:  xmit    1h,aux
+0134: 21 01 [0 w-0 r-0 (00)]          add     r1,r1
+0135: a1 37 [0 w-0 r-0 (00)]          nzt     r1,x0137
+0136: 22 02 [0 w-0 r-0 (00)]          add     r2,r2
+0137: c4 22 [0 w-0 r-0 (00)]  x0137:  xmit    22h,r4
+0138: a1 44 [0 w-0 r-0 (00)]  x0138:  nzt     r1,x0144
+0139: a2 44 [0 w-0 r-0 (00)]          nzt     r2,x0144
+013a: c7 00 [0 w-3 r-0 (18)]          xmit    0h,ivl
+013b: c6 00 [0 w-0 r-0 (00)]          xmit    0h,r6
+013c: e1 77 [0 w-0 r-0 (00)]          jmp     x0177
+013d: c7 ab [0 w-b r-0 (58)]  x013d:  xmit    0abh,ivl
+013e: 17 01 [1 w-0 r-2 (82)]          move    sliv,r1
+013f: 17 02 [1 w-0 r-2 (82)]          move    sliv,r2
+0140: c7 b2 [0 w-b r-0 (58)]          xmit    0b2h,ivl
+0141: 17 03 [1 w-0 r-2 (82)]          move    sliv,r3
+0142: c4 20 [0 w-0 r-0 (00)]          xmit    20h,r4
+0143: e1 6e [0 w-0 r-0 (00)]          jmp     x016e
+0144: 04 07 [0 w-d r-0 (68)]  x0144:  move    r4,ivl
+0145: c0 01 [0 w-0 r-0 (00)]          xmit    1h,aux
+0146: 64 04 [0 w-0 r-0 (00)]          xor     r4,r4
+0147: 04 07 [0 w-d r-0 (68)]          move    r4,ivl
+0148: 64 04 [0 w-0 r-0 (00)]          xor     r4,r4
+0149: c5 07 [0 w-0 r-0 (00)]          xmit    7h,r5
+014a: c0 ff [0 w-0 r-0 (00)]          xmit    0ffh,aux
+014b: 25 05 [0 w-0 r-0 (00)]  x014b:  add     r5,r5
+014c: a5 4b [0 w-0 r-0 (00)]          nzt     r5,x014b
+014d: 04 07 [0 w-d r-0 (68)]          move    r4,ivl
+014e: 21 01 [0 w-0 r-0 (00)]          add     r1,r1
+014f: a1 53 [0 w-0 r-0 (00)]          nzt     r1,x0153
+0150: 01 01 [0 w-0 r-0 (00)]          move    r1,r1
+0151: a2 55 [0 w-0 r-0 (00)]          nzt     r2,x0155
+0152: e1 73 [0 w-0 r-0 (00)]          jmp     x0173
+0153: a8 55 [0 w-0 r-0 (00)]  x0153:  nzt     ovf,x0155
+0154: 22 02 [0 w-0 r-0 (00)]          add     r2,r2
+0155: c0 80 [0 w-0 r-0 (00)]  x0155:  xmit    80h,aux
+0156: 43 05 [0 w-0 r-0 (00)]          and     r3,r5
+0157: a5 60 [0 w-0 r-0 (00)]          nzt     r5,x0160
+0158: c0 ff [0 w-0 r-0 (00)]          xmit    0ffh,aux
+0159: 03 05 [0 w-0 r-0 (00)]          move    r3,r5
+015a: c6 01 [0 w-0 r-0 (00)]  x015a:  xmit    1h,r6
+015b: 26 06 [0 w-0 r-0 (00)]  x015b:  add     r6,r6
+015c: a6 5b [0 w-0 r-0 (00)]          nzt     r6,x015b
+015d: 25 05 [0 w-0 r-0 (00)]          add     r5,r5
+015e: a5 5a [0 w-0 r-0 (00)]          nzt     r5,x015a
+015f: e1 6a [0 w-0 r-0 (00)]          jmp     x016a
+0160: c0 7f [0 w-0 r-0 (00)]  x0160:  xmit    7fh,aux
+0161: 43 05 [0 w-0 r-0 (00)]          and     r3,r5
+0162: c0 ff [0 w-0 r-0 (00)]          xmit    0ffh,aux
+0163: c6 93 [0 w-0 r-0 (00)]          xmit    93h,r6
+0164: e1 66 [0 w-0 r-0 (00)]          jmp     x0166
+0165: c6 a6 [0 w-0 r-0 (00)]  x0165:  xmit    0a6h,r6
+0166: 26 06 [0 w-0 r-0 (00)]  x0166:  add     r6,r6
+0167: a6 66 [0 w-0 r-0 (00)]          nzt     r6,x0166
+0168: 25 05 [0 w-0 r-0 (00)]          add     r5,r5
+0169: a5 65 [0 w-0 r-0 (00)]          nzt     r5,x0165
+016a: c7 40 [0 w-b r-0 (58)]  x016a:  xmit    40h,ivl
+016b: 17 09 [1 w-0 r-2 (82)]          move    sliv,r11
+016c: a9 6e [0 w-0 r-0 (00)]          nzt     r11,x016e
+016d: e1 44 [0 w-0 r-0 (00)]          jmp     x0144
+016e: b6 32 [0 w-0 r-3 (03)]  x016e:  nzt     sliv[1],x0172
+016f: e1 44 [0 w-0 r-0 (00)]          jmp     x0144
+0170: e1 a8 [0 w-0 r-0 (00)]  x0170:  jmp     x01a8
+0171: e1 b0 [0 w-0 r-0 (00)]  x0171:  jmp     x01b0
+0172: e1 b3 [0 w-0 r-0 (00)]  x0172:  jmp     x01b3
+0173: c7 00 [0 w-3 r-0 (18)]  x0173:  xmit    0h,ivl
+0174: c6 00 [0 w-0 r-0 (00)]          xmit    0h,r6
+0175: b0 31 [0 w-0 r-3 (03)]  x0175:  nzt     sliv[7],x0171
+0176: b5 35 [0 w-0 r-3 (03)]          nzt     sliv[2],x0175
+0177: b5 30 [0 w-0 r-3 (03)]  x0177:  nzt     sliv[2],x0170
+0178: b0 31 [0 w-0 r-3 (03)]          nzt     sliv[7],x0171
+0179: a1 77 [0 w-0 r-0 (00)]          nzt     r1,x0177
+017a: c7 03 [0 w-b r-0 (58)]          xmit    3h,ivl
+017b: 17 02 [1 w-0 r-2 (82)]          move    sliv,r2
+017c: 82 da [0 w-0 r-0 (00)]          xec     x01da,r2
+017d: c3 00 [0 w-0 r-0 (00)]          xmit    0h,r3
+017e: c4 0c [0 w-0 r-0 (00)]          xmit    0ch,r4
+017f: 17 00 [1 w-0 r-2 (82)]  x017f:  move    sliv,aux
+0180: 23 03 [0 w-0 r-0 (00)]  x0180:  add     r3,r3
+0181: c0 ff [0 w-0 r-0 (00)]          xmit    0ffh,aux
+0182: 24 04 [0 w-0 r-0 (00)]          add     r4,r4
+0183: a4 7f [0 w-0 r-0 (00)]          nzt     r4,x017f
+0184: 17 00 [1 w-0 r-2 (82)]          move    sliv,aux
+0185: 63 04 [0 w-0 r-0 (00)]          xor     r3,r4
+0186: a4 a6 [0 w-0 r-0 (00)]          nzt     r4,x01a6
+0187: c7 48 [0 w-b r-0 (58)]          xmit    48h,ivl
+0188: 17 03 [1 w-0 r-2 (82)]          move    sliv,r3
+0189: a3 a2 [0 w-0 r-0 (00)]          nzt     r3,x01a2
+018a: c7 02 [0 w-b r-0 (58)]          xmit    2h,ivl
+018b: 17 03 [1 w-0 r-2 (82)]          move    sliv,r3
+018c: c0 01 [0 w-0 r-0 (00)]          xmit    1h,aux
+018d: 43 03 [0 w-0 r-0 (00)]          and     r3,r3
+018e: a3 90 [0 w-0 r-0 (00)]          nzt     r3,x0190
+018f: e1 a2 [0 w-0 r-0 (00)]          jmp     x01a2
+0190: c0 09 [0 w-0 r-0 (00)]  x0190:  xmit    9h,aux
+0191: 22 04 [0 w-0 r-0 (00)]          add     r2,r4
+0192: 04 07 [0 w-c r-0 (60)]          move    r4,ivl
+0193: c7 00 [0 w-b r-0 (58)]          xmit    0h,ivl
+0194: c3 00 [0 w-0 r-0 (00)]          xmit    0h,r3
+0195: c4 00 [0 w-0 r-0 (00)]          xmit    0h,r4
+0196: 17 00 [1 w-0 r-2 (82)]  x0196:  move    sliv,aux
+0197: 23 03 [0 w-0 r-0 (00)]          add     r3,r3
+0198: c0 ff [0 w-0 r-0 (00)]          xmit    0ffh,aux
+0199: 24 04 [0 w-0 r-0 (00)]          add     r4,r4
+019a: a4 96 [0 w-0 r-0 (00)]          nzt     r4,x0196
+019b: c0 90 [0 w-0 r-0 (00)]          xmit    90h,aux
+019c: 22 04 [0 w-0 r-0 (00)]          add     r2,r4
+019d: c7 08 [0 w-c r-0 (60)]          xmit    8h,ivl
+019e: 04 07 [0 w-b r-0 (58)]          move    r4,ivl
+019f: 17 00 [1 w-0 r-2 (82)]          move    sliv,aux
+01a0: 63 04 [0 w-0 r-0 (00)]          xor     r3,r4
+01a1: a4 a4 [0 w-0 r-0 (00)]          nzt     r4,x01a4
+01a2: c1 01 [0 w-0 r-0 (00)]  x01a2:  xmit    1h,r1
+01a3: e1 77 [0 w-0 r-0 (00)]          jmp     x0177
+01a4: c6 2f [0 w-0 r-0 (00)]  x01a4:  xmit    2fh,r6
+01a5: e1 a2 [0 w-0 r-0 (00)]          jmp     x01a2
+01a6: c6 2e [0 w-0 r-0 (00)]  x01a6:  xmit    2eh,r6
+01a7: e1 a2 [0 w-0 r-0 (00)]          jmp     x01a2
+01a8: a6 d5 [0 w-0 r-0 (00)]  x01a8:  nzt     r6,x01d5
+01a9: c7 40 [0 w-b r-0 (58)]          xmit    40h,ivl
+01aa: 17 09 [1 w-0 r-2 (82)]          move    sliv,r11
+01ab: a9 ae [0 w-0 r-0 (00)]          nzt     r11,x01ae
+01ac: c6 00 [0 w-0 r-0 (00)]          xmit    0h,r6
+01ad: e1 c8 [0 w-0 r-0 (00)]          jmp     x01c8
+01ae: c6 2d [0 w-0 r-0 (00)]  x01ae:  xmit    2dh,r6
+01af: e1 c8 [0 w-0 r-0 (00)]  x01af:  jmp     x01c8
+01b0: c6 26 [0 w-0 r-0 (00)]  x01b0:  xmit    26h,r6
+01b1: e1 c8 [0 w-0 r-0 (00)]          jmp     x01c8
+01b2: e1 b0 [0 w-0 r-0 (00)]  x01b2:  jmp     x01b0
+01b3: c7 00 [0 w-3 r-0 (18)]  x01b3:  xmit    0h,ivl
+01b4: b5 37 [0 w-0 r-3 (03)]  x01b4:  nzt     sliv[2],x01b7
+01b5: b0 32 [0 w-0 r-3 (03)]          nzt     sliv[7],x01b2
+01b6: e1 b4 [0 w-0 r-0 (00)]          jmp     x01b4
+01b7: c7 03 [0 w-b r-0 (58)]  x01b7:  xmit    3h,ivl
+01b8: 17 01 [1 w-0 r-2 (82)]          move    sliv,r1
+01b9: 81 cc [0 w-0 r-0 (00)]          xec     x01cc,r1
+01ba: c7 00 [0 w-2 r-0 (10)]          xmit    0h,ivl
+01bb: c7 00 [0 w-2 r-0 (10)]          xmit    0h,ivl
+01bc: c7 01 [0 w-2 r-0 (10)]          xmit    1h,ivl
+01bd: c7 b3 [0 w-b r-0 (58)]          xmit    0b3h,ivl
+01be: c7 00 [0 w-2 r-0 (10)]          xmit    0h,ivl
+01bf: c7 00 [0 w-2 r-0 (10)]          xmit    0h,ivl
+01c0: c7 01 [0 w-2 r-0 (10)]          xmit    1h,ivl
+01c1: c6 00 [0 w-0 r-0 (00)]          xmit    0h,r6
+01c2: c0 ff [0 w-0 r-0 (00)]          xmit    0ffh,aux
+01c3: c7 40 [0 w-b r-0 (58)]          xmit    40h,ivl
+01c4: 17 09 [1 w-0 r-2 (82)]          move    sliv,r11
+01c5: 29 09 [0 w-0 r-0 (00)]          add     r11,r11
+01c6: a9 d5 [0 w-0 r-0 (00)]          nzt     r11,x01d5
+01c7: e1 08 [0 w-0 r-0 (00)]          jmp     x0108
+01c8: c7 a2 [0 w-b r-0 (58)]  x01c8:  xmit    0a2h,ivl
+01c9: 17 01 [1 w-0 r-2 (82)]          move    sliv,r1
+01ca: 17 02 [1 w-0 r-2 (82)]          move    sliv,r2
+01cb: e1 d0 [0 w-0 r-0 (00)]          jmp     x01d0
+01cc: c7 5d [0 w-b r-0 (58)]  x01cc:  xmit    5dh,ivl
+01cd: c7 6d [0 w-b r-0 (58)]          xmit    6dh,ivl
+01ce: c7 7d [0 w-b r-0 (58)]          xmit    7dh,ivl
+01cf: c7 8d [0 w-b r-0 (58)]          xmit    8dh,ivl
+01d0: c7 03 [0 w-b r-0 (58)]  x01d0:  xmit    3h,ivl
+01d1: 17 09 [1 w-0 r-2 (82)]          move    sliv,r11
+01d2: 89 cc [0 w-0 r-0 (00)]          xec     x01cc,r11
+01d3: 01 07 [0 w-2 r-0 (10)]          move    r1,ivl
+01d4: 02 07 [0 w-2 r-0 (10)]          move    r2,ivl
+01d5: c7 20 [0 w-d r-0 (68)]  x01d5:  xmit    20h,ivl
+01d6: c7 c2 [0 w-b r-0 (58)]          xmit    0c2h,ivl
+01d7: 17 09 [1 w-0 r-2 (82)]          move    sliv,r11
+01d8: 06 07 [0 w-2 r-0 (10)]          move    r6,ivl
+01d9: e0 1c [0 w-0 r-0 (00)]          jmp     x001c
+01da: c7 50 [0 w-b r-0 (58)]  x01da:  xmit    50h,ivl
+01db: c7 60 [0 w-b r-0 (58)]          xmit    60h,ivl
+01dc: c7 70 [0 w-b r-0 (58)]  x01dc:  xmit    70h,ivl
+01dd: c7 80 [0 w-b r-0 (58)]          xmit    80h,ivl
+
+; data fill follows
+01de: 9c 9c [1 w-3 r-4 (9c)]          xec     x01dc,sriv[6:3]
+01df: d6 d6 [1 w-a r-6 (d6)]          xmit    16h,dliv[6:1]
+01e0: 28 28 [0 w-5 r-0 (28)]          dw      2828h
+01e1: af af [1 w-5 r-7 (af)]          nzt     ivr,x01af
+01e2: 50 50 [0 w-a r-0 (50)]          and     sliv[8:7],dliv[8:7]
+01e3: 2f 2f [0 w-5 r-7 (2f)]          add     ivr>>>1,ivr
+01e4: 10 10 [0 w-2 r-0 (10)]          move    sliv[14:7],dliv[14:7]
+01e5: 7f 7f [0 w-f r-7 (7f)]          xor     sriv[2:0],driv[2:0]
+01e6: 63 63 [0 w-c r-3 (63)]          xor     r3>>>3,r3
+01e7: 19 19 [0 w-3 r-1 (19)]          move    sriv[13:6],driv[13:6]
+01e8: 08 08 [0 w-1 r-0 (08)]          dw      808h
+01e9: dd dd [1 w-b r-5 (dd)]          xmit    1dh,driv[7:2]
+01ea: 00 00 [0 w-0 r-0 (00)]          nop     
+01eb: ef ef [1 w-d r-7 (ef)]          jmp     x0fef
+01ec: 02 02 [0 w-0 r-2 (02)]          move    r2,r2
+01ed: d3 d3 [1 w-a r-3 (d3)]          xmit    13h,dliv[9:4]
+01ee: 04 04 [0 w-0 r-4 (04)]          move    r4,r4
+01ef: 94 94 [1 w-2 r-4 (94)]          xec     x01f4,sliv[6:3]
+01f0: 50 50 [0 w-a r-0 (50)]          and     sliv[8:7],dliv[8:7]
+01f1: 7f 7f [0 w-f r-7 (7f)]          xor     sriv[2:0],driv[2:0]
+01f2: 40 40 [0 w-8 r-0 (40)]          and     aux>>>2,aux
+01f3: df df [1 w-b r-7 (df)]          xmit    1fh,driv[5:0]
+01f4: 80 80 [1 w-0 r-0 (80)]  x01f4:  xec     x0180,aux
+01f5: 2f 2f [0 w-5 r-7 (2f)]          add     ivr>>>1,ivr
+01f6: 74 74 [0 w-e r-4 (74)]          xor     sliv[5:3],dliv[5:3]
+; end of data fill
+
+01f7: c1 02 [0 w-0 r-0 (00)]  x01f7:  xmit    2h,r1
+01f8: e1 fa [0 w-0 r-0 (00)]          jmp     x01fa
+01f9: c1 00 [0 w-0 r-0 (00)]  x01f9:  xmit    0h,r1
+01fa: c7 28 [0 w-b r-0 (58)]  x01fa:  xmit    28h,ivl
+01fb: 01 07 [0 w-2 r-0 (10)]          move    r1,ivl
+01fc: c7 20 [0 w-b r-0 (58)]          xmit    20h,ivl
+01fd: 17 01 [1 w-0 r-2 (82)]          move    sliv,r1
+01fe: 17 02 [1 w-0 r-2 (82)]          move    sliv,r2
+01ff: 17 03 [1 w-0 r-2 (82)]          move    sliv,r3
+0200: 17 04 [1 w-0 r-2 (82)]          move    sliv,r4
+0201: 17 05 [1 w-0 r-2 (82)]          move    sliv,r5
+0202: 17 06 [1 w-0 r-2 (82)]          move    sliv,r6
+0203: 17 09 [1 w-0 r-2 (82)]          move    sliv,r11
+0204: 06 07 [0 w-9 r-0 (48)]          move    r6,ivl
+0205: 09 07 [0 w-a r-0 (50)]          move    r11,ivl
+0206: c0 ff [0 w-0 r-0 (00)]          xmit    0ffh,aux
+0207: 61 01 [0 w-0 r-0 (00)]          xor     r1,r1
+0208: 62 02 [0 w-0 r-0 (00)]          xor     r2,r2
+0209: c0 01 [0 w-0 r-0 (00)]          xmit    1h,aux
+020a: 21 01 [0 w-0 r-0 (00)]          add     r1,r1
+020b: a1 0d [0 w-0 r-0 (00)]          nzt     r1,x020d
+020c: 22 02 [0 w-0 r-0 (00)]          add     r2,r2
+020d: 41 09 [0 w-0 r-0 (00)]  x020d:  and     r1,r11
+020e: a9 15 [0 w-0 r-0 (00)]          nzt     r11,x0215
+020f: 45 09 [0 w-0 r-0 (00)]          and     r5,r11
+0210: a9 15 [0 w-0 r-0 (00)]          nzt     r11,x0215
+0211: 43 09 [0 w-0 r-0 (00)]          and     r3,r11
+0212: a9 15 [0 w-0 r-0 (00)]          nzt     r11,x0215
+0213: c7 2c [0 w-b r-0 (58)]          xmit    2ch,ivl
+0214: 17 00 [1 w-0 r-2 (82)]          move    sliv,aux
+0215: c7 28 [0 w-b r-0 (58)]  x0215:  xmit    28h,ivl
+0216: 17 09 [1 w-0 r-2 (82)]          move    sliv,r11
+0217: 29 09 [0 w-0 r-0 (00)]          add     r11,r11
+0218: 03 07 [0 w-b r-0 (58)]          move    r3,ivl
+0219: c0 1f [0 w-0 r-0 (00)]          xmit    1fh,aux
+021a: 44 04 [0 w-0 r-0 (00)]          and     r4,r4
+021b: 84 bf [0 w-0 r-0 (00)]          xec     x02bf,r4
+021c: c7 00 [0 w-3 r-0 (18)]          xmit    0h,ivl
+021d: c0 03 [0 w-0 r-0 (00)]          xmit    3h,aux
+021e: 49 09 [0 w-0 r-0 (00)]          and     r11,r11
+021f: c7 34 [0 w-0 r-0 (00)]          xmit    34h,ivl
+0220: 89 21 [0 w-0 r-0 (00)]          xec     x0221,r11
+0221: e2 92 [0 w-0 r-0 (00)]  x0221:  jmp     x0292
+0222: e2 6f [0 w-0 r-0 (00)]          jmp     x026f
+0223: e2 41 [0 w-0 r-0 (00)]          jmp     x0241
+0224: e2 25 [0 w-0 r-0 (00)]          jmp     x0225
+0225: c0 01 [0 w-0 r-0 (00)]  x0225:  xmit    1h,aux
+0226: b7 26 [0 w-0 r-5 (05)]  x0226:  nzt     sliv[0],x0226
+0227: 10 10 [1 w-f r-2 (fa)]  x0227:  move    sliv[14:7],dliv[14:7]
+0228: 05 07 [0 w-5 r-0 (28)]          move    r5,ivl
+0229: 21 01 [0 w-0 r-0 (00)]          add     r1,r1
+022a: 23 03 [0 w-0 r-0 (00)]          add     r3,r3
+022b: 25 05 [0 w-0 r-0 (00)]          add     r5,r5
+022c: a1 2f [0 w-0 r-0 (00)]          nzt     r1,x022f
+022d: 22 02 [0 w-0 r-0 (00)]          add     r2,r2
+022e: a8 64 [0 w-0 r-0 (00)]          nzt     ovf,x0264
+022f: a3 3f [0 w-0 r-0 (00)]  x022f:  nzt     r3,x023f
+0230: 24 04 [0 w-0 r-0 (00)]          add     r4,r4
+0231: a5 3b [0 w-0 r-0 (00)]          nzt     r5,x023b
+0232: 26 06 [0 w-0 r-0 (00)]  x0232:  add     r6,r6
+0233: a6 3b [0 w-0 r-0 (00)]          nzt     r6,x023b
+0234: b7 34 [0 w-0 r-5 (05)]  x0234:  nzt     sliv[0],x0234
+0235: c7 08 [0 w-c r-0 (60)]          xmit    8h,ivl
+0236: c7 26 [0 w-b r-0 (58)]          xmit    26h,ivl
+0237: 17 09 [1 w-0 r-2 (82)]          move    sliv,r11
+0238: 29 09 [0 w-0 r-0 (00)]          add     r11,r11
+0239: 09 07 [0 w-a r-0 (50)]          move    r11,ivl
+023a: 03 07 [0 w-b r-0 (58)]          move    r3,ivl
+023b: b7 3b [0 w-0 r-5 (05)]  x023b:  nzt     sliv[0],x023b
+023c: 06 07 [0 w-9 r-0 (48)]          move    r6,ivl
+023d: 84 bf [0 w-0 r-0 (00)]          xec     x02bf,r4
+023e: e2 27 [0 w-0 r-0 (00)]          jmp     x0227
+023f: a5 26 [0 w-0 r-0 (00)]  x023f:  nzt     r5,x0226
+0240: e2 32 [0 w-0 r-0 (00)]          jmp     x0232
+0241: c7 b4 [0 w-0 r-0 (00)]  x0241:  xmit    0b4h,ivl
+0242: c0 02 [0 w-0 r-0 (00)]          xmit    2h,aux
+0243: b7 23 [0 w-0 r-5 (05)]  x0243:  nzt     sliv[0],x0243
+0244: 10 10 [1 w-f r-2 (fa)]  x0244:  move    sliv[14:7],dliv[14:7]
+0245: 10 10 [1 w-e r-2 (f2)]          move    sliv[14:7],dliv[14:7]
+0246: 05 07 [0 w-5 r-0 (28)]          move    r5,ivl
+0247: 21 01 [0 w-0 r-0 (00)]          add     r1,r1
+0248: 23 03 [0 w-0 r-0 (00)]          add     r3,r3
+0249: 25 05 [0 w-0 r-0 (00)]          add     r5,r5
+024a: a1 4f [0 w-0 r-0 (00)]          nzt     r1,x024f
+024b: c0 01 [0 w-0 r-0 (00)]          xmit    1h,aux
+024c: 22 02 [0 w-0 r-0 (00)]          add     r2,r2
+024d: c0 02 [0 w-0 r-0 (00)]          xmit    2h,aux
+024e: a8 64 [0 w-0 r-0 (00)]          nzt     ovf,x0264
+024f: a3 61 [0 w-0 r-0 (00)]  x024f:  nzt     r3,x0261
+0250: c0 01 [0 w-0 r-0 (00)]          xmit    1h,aux
+0251: 24 04 [0 w-0 r-0 (00)]          add     r4,r4
+0252: a5 5c [0 w-0 r-0 (00)]          nzt     r5,x025c
+0253: 26 06 [0 w-0 r-0 (00)]  x0253:  add     r6,r6
+0254: a6 5c [0 w-0 r-0 (00)]          nzt     r6,x025c
+0255: b7 35 [0 w-0 r-5 (05)]  x0255:  nzt     sliv[0],x0255
+0256: c7 08 [0 w-c r-0 (60)]          xmit    8h,ivl
+0257: c7 26 [0 w-b r-0 (58)]          xmit    26h,ivl
+0258: 17 09 [1 w-0 r-2 (82)]          move    sliv,r11
+0259: 29 09 [0 w-0 r-0 (00)]          add     r11,r11
+025a: 09 07 [0 w-a r-0 (50)]          move    r11,ivl
+025b: 03 07 [0 w-b r-0 (58)]          move    r3,ivl
+025c: c0 02 [0 w-0 r-0 (00)]  x025c:  xmit    2h,aux
+025d: b7 3d [0 w-0 r-5 (05)]  x025d:  nzt     sliv[0],x025d
+025e: 06 07 [0 w-9 r-0 (48)]          move    r6,ivl
+025f: 84 bf [0 w-0 r-0 (00)]          xec     x02bf,r4
+0260: e2 44 [0 w-0 r-0 (00)]          jmp     x0244
+0261: a5 43 [0 w-0 r-0 (00)]  x0261:  nzt     r5,x0243
+0262: c0 01 [0 w-0 r-0 (00)]          xmit    1h,aux
+0263: e2 53 [0 w-0 r-0 (00)]          jmp     x0253
+0264: b7 24 [0 w-0 r-5 (05)]  x0264:  nzt     sliv[0],x0264
+0265: c7 34 [0 w-0 r-0 (00)]  x0265:  xmit    34h,ivl
+0266: c6 00 [0 w-0 r-0 (00)]          xmit    0h,r6
+0267: b0 29 [0 w-0 r-3 (03)]          nzt     sliv[7],x0269
+0268: e2 6a [0 w-0 r-0 (00)]          jmp     x026a
+0269: c6 24 [0 w-0 r-0 (00)]  x0269:  xmit    24h,r6
+026a: c7 08 [0 w-c r-0 (60)]  x026a:  xmit    8h,ivl
+026b: c7 27 [0 w-b r-0 (58)]          xmit    27h,ivl
+026c: 17 09 [1 w-0 r-2 (82)]          move    sliv,r11
+026d: 06 07 [0 w-2 r-0 (10)]          move    r6,ivl
+026e: e0 1c [0 w-0 r-0 (00)]          jmp     x001c
+026f: c0 01 [0 w-0 r-0 (00)]  x026f:  xmit    1h,aux
+0270: e2 73 [0 w-0 r-0 (00)]          jmp     x0273
+
+0271: b7 31 [0 w-0 r-5 (05)]  x0271:  nzt     sliv[0],x0271
+
+0272: 10 10 [0 w-2 r-4 (14)]          move    sliv[14:7],dliv[14:7]
+0273: 05 07 [0 w-6 r-0 (30)]  x0273:  move    r5,ivl
+0274: 21 01 [0 w-0 r-0 (00)]          add     r1,r1
+0275: 23 03 [0 w-0 r-0 (00)]          add     r3,r3
+0276: 25 05 [0 w-0 r-0 (00)]          add     r5,r5
+0277: a1 7a [0 w-0 r-0 (00)]          nzt     r1,x027a
+0278: 22 02 [0 w-0 r-0 (00)]          add     r2,r2
+0279: a8 8f [0 w-0 r-0 (00)]          nzt     ovf,x028f
+027a: a3 8d [0 w-0 r-0 (00)]  x027a:  nzt     r3,x028d
+027b: 24 04 [0 w-0 r-0 (00)]          add     r4,r4
+027c: a5 88 [0 w-0 r-0 (00)]          nzt     r5,x0288
+027d: 26 06 [0 w-0 r-0 (00)]  x027d:  add     r6,r6
+027e: a6 88 [0 w-0 r-0 (00)]          nzt     r6,x0288
+027f: b7 3f [0 w-0 r-5 (05)]  x027f:  nzt     sliv[0],x027f
+0280: 10 10 [0 w-2 r-4 (14)]          move    sliv[14:7],dliv[14:7]
+0281: c7 08 [0 w-c r-0 (60)]          xmit    8h,ivl
+0282: c7 26 [0 w-b r-0 (58)]          xmit    26h,ivl
+0283: 17 09 [1 w-0 r-2 (82)]          move    sliv,r11
+0284: 29 09 [0 w-0 r-0 (00)]          add     r11,r11
+0285: 09 07 [0 w-a r-0 (50)]          move    r11,ivl
+0286: 03 07 [0 w-b r-0 (58)]          move    r3,ivl
+0287: e2 8a [0 w-0 r-0 (00)]          jmp     x028a
+0288: b7 28 [0 w-0 r-5 (05)]  x0288:  nzt     sliv[0],x0288
+0289: 10 10 [0 w-2 r-4 (14)]          move    sliv[14:7],dliv[14:7]
+028a: 06 07 [0 w-9 r-0 (48)]  x028a:  move    r6,ivl
+028b: 84 bf [0 w-0 r-0 (00)]          xec     x02bf,r4
+028c: e2 73 [0 w-0 r-0 (00)]          jmp     x0273
+028d: a5 71 [0 w-0 r-0 (00)]  x028d:  nzt     r5,x0271
+028e: e2 7d [0 w-0 r-0 (00)]          jmp     x027d
+028f: b7 2f [0 w-0 r-5 (05)]  x028f:  nzt     sliv[0],x028f
+0290: 10 10 [0 w-2 r-4 (14)]          move    sliv[14:7],dliv[14:7]
+0291: e2 65 [0 w-0 r-0 (00)]          jmp     x0265
+0292: c7 b4 [0 w-0 r-0 (00)]  x0292:  xmit    0b4h,ivl
+0293: c0 02 [0 w-0 r-0 (00)]          xmit    2h,aux
+0294: e2 98 [0 w-0 r-0 (00)]          jmp     x0298
+0295: b7 35 [0 w-0 r-5 (05)]  x0295:  nzt     sliv[0],x0295
+0296: 10 10 [0 w-2 r-4 (14)]          move    sliv[14:7],dliv[14:7]
+0297: 10 10 [0 w-2 r-3 (13)]          move    sliv[14:7],dliv[14:7]
+0298: 05 07 [0 w-6 r-0 (30)]  x0298:  move    r5,ivl
+0299: 21 01 [0 w-0 r-0 (00)]          add     r1,r1
+029a: 23 03 [0 w-0 r-0 (00)]          add     r3,r3
+029b: 25 05 [0 w-0 r-0 (00)]          add     r5,r5
+029c: a1 a1 [0 w-0 r-0 (00)]          nzt     r1,x02a1
+029d: c0 01 [0 w-0 r-0 (00)]          xmit    1h,aux
+029e: 22 02 [0 w-0 r-0 (00)]          add     r2,r2
+029f: c0 02 [0 w-0 r-0 (00)]          xmit    2h,aux
+02a0: a8 bb [0 w-0 r-0 (00)]          nzt     ovf,x02bb
+02a1: a3 b8 [0 w-0 r-0 (00)]  x02a1:  nzt     r3,x02b8
+02a2: c0 01 [0 w-0 r-0 (00)]          xmit    1h,aux
+02a3: 24 04 [0 w-0 r-0 (00)]          add     r4,r4
+02a4: a5 b1 [0 w-0 r-0 (00)]          nzt     r5,x02b1
+02a5: 26 06 [0 w-0 r-0 (00)]  x02a5:  add     r6,r6
+02a6: a6 b1 [0 w-0 r-0 (00)]          nzt     r6,x02b1
+02a7: b7 27 [0 w-0 r-5 (05)]  x02a7:  nzt     sliv[0],x02a7
+02a8: 10 10 [0 w-2 r-4 (14)]          move    sliv[14:7],dliv[14:7]
+02a9: 10 10 [0 w-2 r-3 (13)]          move    sliv[14:7],dliv[14:7]
+02aa: c7 08 [0 w-c r-0 (60)]          xmit    8h,ivl
+02ab: c7 26 [0 w-b r-0 (58)]          xmit    26h,ivl
+02ac: 17 09 [1 w-0 r-2 (82)]          move    sliv,r11
+02ad: 29 09 [0 w-0 r-0 (00)]          add     r11,r11
+02ae: 09 07 [0 w-a r-0 (50)]          move    r11,ivl
+02af: 03 07 [0 w-b r-0 (58)]          move    r3,ivl
+02b0: e2 b5 [0 w-0 r-0 (00)]          jmp     x02b5
+02b1: c0 02 [0 w-0 r-0 (00)]  x02b1:  xmit    2h,aux
+02b2: b7 32 [0 w-0 r-5 (05)]  x02b2:  nzt     sliv[0],x02b2
+02b3: 10 10 [0 w-2 r-4 (14)]          move    sliv[14:7],dliv[14:7]
+02b4: 10 10 [0 w-2 r-3 (13)]          move    sliv[14:7],dliv[14:7]
+02b5: 06 07 [0 w-9 r-0 (48)]  x02b5:  move    r6,ivl
+02b6: 84 bf [0 w-0 r-0 (00)]          xec     x02bf,r4
+02b7: e2 92 [0 w-0 r-0 (00)]          jmp     x0292
+02b8: a5 95 [0 w-0 r-0 (00)]  x02b8:  nzt     r5,x0295
+02b9: c0 01 [0 w-0 r-0 (00)]          xmit    1h,aux
+02ba: e2 a5 [0 w-0 r-0 (00)]          jmp     x02a5
+02bb: b7 3b [0 w-0 r-5 (05)]  x02bb:  nzt     sliv[0],x02bb
+02bc: 10 10 [0 w-2 r-4 (14)]          move    sliv[14:7],dliv[14:7]
+02bd: 10 10 [0 w-2 r-3 (13)]          move    sliv[14:7],dliv[14:7]
+02be: e2 65 [0 w-0 r-0 (00)]          jmp     x0265
+02bf: c7 08 [0 w-c r-0 (60)]  x02bf:  xmit    8h,ivl
+02c0: c7 09 [0 w-c r-0 (60)]          xmit    9h,ivl
+02c1: c7 0a [0 w-c r-0 (60)]          xmit    0ah,ivl
+02c2: c7 0b [0 w-c r-0 (60)]          xmit    0bh,ivl
+02c3: c7 0c [0 w-c r-0 (60)]          xmit    0ch,ivl
+02c4: c7 0d [0 w-c r-0 (60)]          xmit    0dh,ivl
+02c5: c7 0e [0 w-c r-0 (60)]          xmit    0eh,ivl
+02c6: c7 0f [0 w-c r-0 (60)]          xmit    0fh,ivl
+02c7: e2 c8 [0 w-0 r-0 (00)]          jmp     x02c8
+02c8: c6 16 [0 w-0 r-0 (00)]  x02c8:  xmit    16h,r6
+02c9: e2 6a [0 w-0 r-0 (00)]          jmp     x026a
+02ca: c7 c2 [0 w-b r-0 (58)]  x02ca:  xmit    0c2h,ivl
+02cb: c7 1c [0 w-2 r-0 (10)]          xmit    1ch,ivl
+02cc: e1 04 [0 w-0 r-0 (00)]          jmp     x0104
+02cd: e3 4c [0 w-0 r-0 (00)]  x02cd:  jmp     x034c
+02ce: a6 cd [0 w-0 r-0 (00)]  x02ce:  nzt     r6,x02cd
+02cf: c7 ca [0 w-b r-0 (58)]          xmit    0cah,ivl
+02d0: c7 20 [0 w-2 r-0 (10)]          xmit    20h,ivl
+02d1: e5 69 [0 w-0 r-0 (00)]          jmp     x0569
+02d2: 06 04 [0 w-0 r-0 (00)]  x02d2:  move    r6,r4
+02d3: c7 42 [0 w-b r-0 (58)]          xmit    42h,ivl
+02d4: 17 06 [1 w-0 r-2 (82)]          move    sliv,r6
+02d5: c7 a9 [0 w-b r-0 (58)]          xmit    0a9h,ivl
+02d6: 17 03 [1 w-0 r-2 (82)]          move    sliv,r3
+02d7: c7 0d [0 w-c r-0 (60)]          xmit    0dh,ivl
+02d8: c7 00 [0 w-b r-0 (58)]          xmit    0h,ivl
+02d9: c7 00 [0 w-7 r-0 (38)]          xmit    0h,ivl
+02da: c7 00 [0 w-3 r-0 (18)]          xmit    0h,ivl
+02db: b7 3f [0 w-0 r-3 (03)]  x02db:  nzt     sliv[0],x02df
+02dc: b0 3e [0 w-0 r-3 (03)]          nzt     sliv[7],x02de
+02dd: e2 db [0 w-0 r-0 (00)]          jmp     x02db
+02de: e3 53 [0 w-0 r-0 (00)]  x02de:  jmp     x0353
+02df: c0 ff [0 w-0 r-0 (00)]  x02df:  xmit    0ffh,aux
+02e0: c9 10 [0 w-0 r-0 (00)]          xmit    10h,r11
+02e1: c7 4e [0 w-1 r-0 (08)]          xmit    4eh,ivl
+02e2: c7 35 [0 w-0 r-0 (00)]          xmit    35h,ivl
+02e3: 05 07 [0 w-d r-0 (68)]          move    r5,ivl
+02e4: b5 24 [0 w-0 r-5 (05)]  x02e4:  nzt     sliv[2],x02e4
+02e5: c7 4e [0 w-1 r-0 (08)]          xmit    4eh,ivl
+02e6: 29 09 [0 w-0 r-0 (00)]          add     r11,r11
+02e7: a9 e4 [0 w-0 r-0 (00)]          nzt     r11,x02e4
+02e8: c7 00 [0 w-7 r-0 (38)]          xmit    0h,ivl
+02e9: b5 29 [0 w-0 r-5 (05)]  x02e9:  nzt     sliv[2],x02e9
+02ea: c7 00 [0 w-1 r-0 (08)]          xmit    0h,ivl
+02eb: c9 09 [0 w-0 r-0 (00)]          xmit    9h,r11
+02ec: b5 2c [0 w-0 r-5 (05)]  x02ec:  nzt     sliv[2],x02ec
+02ed: c7 00 [0 w-1 r-0 (08)]          xmit    0h,ivl
+02ee: b5 2e [0 w-0 r-5 (05)]  x02ee:  nzt     sliv[2],x02ee
+02ef: c7 00 [0 w-1 r-0 (08)]          xmit    0h,ivl
+02f0: c7 25 [0 w-0 r-0 (00)]          xmit    25h,ivl
+02f1: b5 31 [0 w-0 r-5 (05)]  x02f1:  nzt     sliv[2],x02f1
+02f2: c7 00 [0 w-1 r-0 (08)]          xmit    0h,ivl
+02f3: c7 35 [0 w-0 r-0 (00)]          xmit    35h,ivl
+02f4: b5 34 [0 w-0 r-5 (05)]  x02f4:  nzt     sliv[2],x02f4
+02f5: c7 00 [0 w-1 r-0 (08)]          xmit    0h,ivl
+02f6: 29 09 [0 w-0 r-0 (00)]          add     r11,r11
+02f7: a9 f4 [0 w-0 r-0 (00)]          nzt     r11,x02f4
+02f8: b5 38 [0 w-0 r-5 (05)]  x02f8:  nzt     sliv[2],x02f8
+02f9: c7 a1 [0 w-1 r-0 (08)]          xmit    0a1h,ivl
+02fa: b5 3a [0 w-0 r-5 (05)]  x02fa:  nzt     sliv[2],x02fa
+02fb: c7 fe [0 w-1 r-0 (08)]          xmit    0feh,ivl
+02fc: b5 3c [0 w-0 r-5 (05)]  x02fc:  nzt     sliv[2],x02fc
+02fd: 01 07 [0 w-1 r-0 (08)]          move    r1,ivl
+02fe: b5 3e [0 w-0 r-5 (05)]  x02fe:  nzt     sliv[2],x02fe
+02ff: 02 07 [0 w-1 r-0 (08)]          move    r2,ivl
+0300: b5 20 [0 w-0 r-5 (05)]  x0300:  nzt     sliv[2],x0300
+0301: 10 10 [1 w-1 r-2 (8a)]          move    sliv[14:7],dliv[14:7]
+0302: b5 22 [0 w-0 r-5 (05)]  x0302:  nzt     sliv[2],x0302
+0303: c7 00 [0 w-1 r-0 (08)]          xmit    0h,ivl
+0304: c7 15 [0 w-0 r-0 (00)]          xmit    15h,ivl
+0305: b5 25 [0 w-0 r-5 (05)]  x0305:  nzt     sliv[2],x0305
+0306: c7 00 [0 w-1 r-0 (08)]          xmit    0h,ivl
+0307: b5 27 [0 w-0 r-5 (05)]  x0307:  nzt     sliv[2],x0307
+0308: c7 00 [0 w-1 r-0 (08)]          xmit    0h,ivl
+0309: b5 29 [0 w-0 r-5 (05)]  x0309:  nzt     sliv[2],x0309
+030a: c7 00 [0 w-1 r-0 (08)]          xmit    0h,ivl
+030b: b5 2b [0 w-0 r-5 (05)]  x030b:  nzt     sliv[2],x030b
+030c: c7 00 [0 w-1 r-0 (08)]          xmit    0h,ivl
+030d: c7 34 [0 w-0 r-0 (00)]          xmit    34h,ivl
+030e: b5 2e [0 w-0 r-5 (05)]  x030e:  nzt     sliv[2],x030e
+030f: c7 00 [0 w-1 r-0 (08)]          xmit    0h,ivl
+0310: b5 30 [0 w-0 r-5 (05)]  x0310:  nzt     sliv[2],x0310
+0311: c7 00 [0 w-1 r-0 (08)]          xmit    0h,ivl
+0312: c7 24 [0 w-0 r-0 (00)]          xmit    24h,ivl
+0313: b5 33 [0 w-0 r-5 (05)]  x0313:  nzt     sliv[2],x0313
+0314: c7 00 [0 w-1 r-0 (08)]          xmit    0h,ivl
+0315: c7 34 [0 w-0 r-0 (00)]          xmit    34h,ivl
+0316: c9 0d [0 w-0 r-0 (00)]          xmit    0dh,r11
+0317: b5 37 [0 w-0 r-5 (05)]  x0317:  nzt     sliv[2],x0317
+0318: c7 00 [0 w-1 r-0 (08)]          xmit    0h,ivl
+0319: 29 09 [0 w-0 r-0 (00)]          add     r11,r11
+031a: a9 17 [0 w-0 r-0 (00)]          nzt     r11,x0317
+031b: b5 3b [0 w-0 r-5 (05)]  x031b:  nzt     sliv[2],x031b
+031c: c7 a1 [0 w-1 r-0 (08)]          xmit    0a1h,ivl
+031d: b5 3d [0 w-0 r-5 (05)]  x031d:  nzt     sliv[2],x031d
+031e: c7 f8 [0 w-1 r-0 (08)]          xmit    0f8h,ivl
+031f: 04 09 [0 w-0 r-0 (00)]          move    r4,r11
+0320: b5 20 [0 w-0 r-5 (05)]  x0320:  nzt     sliv[2],x0320
+0321: c7 e5 [0 w-1 r-0 (08)]          xmit    0e5h,ivl
+0322: b5 22 [0 w-0 r-5 (05)]  x0322:  nzt     sliv[2],x0322
+0323: c7 e5 [0 w-1 r-0 (08)]          xmit    0e5h,ivl
+0324: b5 24 [0 w-0 r-5 (05)]  x0324:  nzt     sliv[2],x0324
+0325: c7 e5 [0 w-1 r-0 (08)]          xmit    0e5h,ivl
+0326: 29 09 [0 w-0 r-0 (00)]          add     r11,r11
+0327: b5 27 [0 w-0 r-5 (05)]  x0327:  nzt     sliv[2],x0327
+0328: c7 e5 [0 w-1 r-0 (08)]          xmit    0e5h,ivl
+0329: a9 20 [0 w-0 r-0 (00)]          nzt     r11,x0320
+032a: b5 2a [0 w-0 r-5 (05)]  x032a:  nzt     sliv[2],x032a
+032b: c7 00 [0 w-1 r-0 (08)]          xmit    0h,ivl
+032c: c7 14 [0 w-0 r-0 (00)]          xmit    14h,ivl
+032d: b5 2d [0 w-0 r-5 (05)]  x032d:  nzt     sliv[2],x032d
+032e: c7 00 [0 w-1 r-0 (08)]          xmit    0h,ivl
+032f: b5 2f [0 w-0 r-5 (05)]  x032f:  nzt     sliv[2],x032f
+0330: c7 00 [0 w-1 r-0 (08)]          xmit    0h,ivl
+0331: b5 31 [0 w-0 r-5 (05)]  x0331:  nzt     sliv[2],x0331
+0332: c7 00 [0 w-1 r-0 (08)]          xmit    0h,ivl
+0333: b5 33 [0 w-0 r-5 (05)]  x0333:  nzt     sliv[2],x0333
+0334: c7 00 [0 w-1 r-0 (08)]          xmit    0h,ivl
+0335: c7 35 [0 w-0 r-0 (00)]          xmit    35h,ivl
+0336: 06 09 [0 w-0 r-0 (00)]          move    r6,r11
+0337: b5 37 [0 w-0 r-5 (05)]  x0337:  nzt     sliv[2],x0337
+0338: c7 4e [0 w-1 r-0 (08)]          xmit    4eh,ivl
+0339: 29 09 [0 w-0 r-0 (00)]          add     r11,r11
+033a: a9 37 [0 w-0 r-0 (00)]          nzt     r11,x0337
+033b: b5 3b [0 w-0 r-5 (05)]  x033b:  nzt     sliv[2],x033b
+033c: c7 4e [0 w-1 r-0 (08)]          xmit    4eh,ivl
+033d: 23 03 [0 w-0 r-0 (00)]          add     r3,r3
+033e: b5 3e [0 w-0 r-5 (05)]  x033e:  nzt     sliv[2],x033e
+033f: c7 4e [0 w-1 r-0 (08)]          xmit    4eh,ivl
+0340: a3 57 [0 w-0 r-0 (00)]          nzt     r3,x0357
+0341: b5 21 [0 w-0 r-5 (05)]  x0341:  nzt     sliv[2],x0341
+0342: c7 4e [0 w-1 r-0 (08)]          xmit    4eh,ivl
+0343: b7 33 [0 w-0 r-3 (03)]          nzt     sliv[0],x0353
+0344: b5 24 [0 w-0 r-5 (05)]  x0344:  nzt     sliv[2],x0344
+0345: c7 4e [0 w-1 r-0 (08)]          xmit    4eh,ivl
+0346: b7 2a [0 w-0 r-3 (03)]  x0346:  nzt     sliv[0],x034a
+0347: b5 26 [0 w-0 r-5 (05)]          nzt     sliv[2],x0346
+0348: c7 4e [0 w-1 r-0 (08)]          xmit    4eh,ivl
+0349: e3 46 [0 w-0 r-0 (00)]          jmp     x0346
+034a: c6 00 [0 w-0 r-0 (00)]  x034a:  xmit    0h,r6
+034b: b0 35 [0 w-0 r-3 (03)]          nzt     sliv[7],x0355
+034c: c7 34 [0 w-0 r-0 (00)]  x034c:  xmit    34h,ivl
+034d: c7 20 [0 w-d r-0 (68)]          xmit    20h,ivl
+034e: c7 08 [0 w-c r-0 (60)]          xmit    8h,ivl
+034f: c7 cc [0 w-b r-0 (58)]          xmit    0cch,ivl
+0350: 17 09 [1 w-0 r-2 (82)]          move    sliv,r11
+0351: 06 07 [0 w-2 r-0 (10)]          move    r6,ivl
+0352: e0 1c [0 w-0 r-0 (00)]          jmp     x001c
+0353: c6 2c [0 w-0 r-0 (00)]  x0353:  xmit    2ch,r6
+0354: e3 4c [0 w-0 r-0 (00)]          jmp     x034c
+0355: c6 27 [0 w-0 r-0 (00)]  x0355:  xmit    27h,r6
+0356: e3 4c [0 w-0 r-0 (00)]          jmp     x034c
+0357: e2 e9 [0 w-0 r-0 (00)]  x0357:  jmp     x02e9
+0358: 01 01 [0 w-0 r-0 (00)]  x0358:  move    r1,r1
+0359: 01 01 [0 w-0 r-0 (00)]          move    r1,r1
+035a: c5 fd [0 w-0 r-0 (00)]          xmit    0fdh,r5
+035b: c7 00 [0 w-7 r-0 (38)]          xmit    0h,ivl
+035c: c7 00 [0 w-3 r-0 (18)]  x035c:  xmit    0h,ivl
+035d: c7 20 [0 w-d r-0 (68)]  x035d:  xmit    20h,ivl
+035e: c7 35 [0 w-0 r-0 (00)]          xmit    35h,ivl
+035f: c7 40 [0 w-d r-0 (68)]          xmit    40h,ivl
+0360: b7 25 [0 w-0 r-3 (03)]  x0360:  nzt     sliv[0],x0365
+0361: b0 24 [0 w-0 r-3 (03)]          nzt     sliv[7],x0364
+0362: b2 27 [0 w-0 r-3 (03)]          nzt     sliv[5],x0367
+0363: e3 60 [0 w-0 r-0 (00)]          jmp     x0360
+0364: e3 b0 [0 w-0 r-0 (00)]  x0364:  jmp     x03b0
+0365: e3 a7 [0 w-0 r-0 (00)]  x0365:  jmp     x03a7
+0366: e3 78 [0 w-0 r-0 (00)]          jmp     x0378
+0367: c9 f7 [0 w-0 r-0 (00)]  x0367:  xmit    0f7h,r11
+0368: c0 01 [0 w-0 r-0 (00)]          xmit    1h,aux
+0369: 29 09 [0 w-0 r-0 (00)]  x0369:  add     r11,r11
+036a: b1 2c [0 w-0 r-3 (03)]          nzt     sliv[6],x036c
+036b: e3 5d [0 w-0 r-0 (00)]          jmp     x035d
+036c: a9 69 [0 w-0 r-0 (00)]  x036c:  nzt     r11,x0369
+036d: c7 75 [0 w-0 r-0 (00)]          xmit    75h,ivl
+036e: c9 fd [0 w-0 r-0 (00)]          xmit    0fdh,r11
+036f: 29 09 [0 w-0 r-0 (00)]  x036f:  add     r11,r11
+0370: b1 32 [0 w-0 r-3 (03)]          nzt     sliv[6],x0372
+0371: e3 5d [0 w-0 r-0 (00)]          jmp     x035d
+0372: a9 6f [0 w-0 r-0 (00)]  x0372:  nzt     r11,x036f
+0373: c7 65 [0 w-0 r-0 (00)]          xmit    65h,ivl
+0374: c7 75 [0 w-0 r-0 (00)]          xmit    75h,ivl
+0375: 17 09 [0 w-0 r-6 (06)]          move    sliv,r11
+0376: c0 fe [0 w-0 r-0 (00)]          xmit    0feh,aux
+0377: e3 78 [0 w-0 r-0 (00)]          jmp     x0378
+0378: b7 25 [0 w-0 r-3 (03)]  x0378:  nzt     sliv[0],x0365
+0379: b0 24 [0 w-0 r-3 (03)]          nzt     sliv[7],x0364
+037a: b1 38 [0 w-0 r-3 (03)]          nzt     sliv[6],x0378
+037b: c9 0e [0 w-0 r-0 (00)]          xmit    0eh,r11
+037c: 01 01 [0 w-0 r-0 (00)]          move    r1,r1
+037d: 01 01 [0 w-0 r-0 (00)]          move    r1,r1
+037e: 01 01 [0 w-0 r-0 (00)]          move    r1,r1
+037f: 01 01 [0 w-0 r-0 (00)]          move    r1,r1
+0380: 29 09 [0 w-0 r-0 (00)]  x0380:  add     r11,r11
+0381: b5 24 [0 w-0 r-5 (05)]          nzt     sliv[2],x0384
+0382: 17 09 [0 w-0 r-6 (06)]          move    sliv,r11
+0383: e3 88 [0 w-0 r-0 (00)]  x0383:  jmp     x0388
+0384: a9 86 [0 w-0 r-0 (00)]  x0384:  nzt     r11,x0386
+0385: e3 5d [0 w-0 r-0 (00)]          jmp     x035d
+0386: b5 20 [0 w-0 r-5 (05)]  x0386:  nzt     sliv[2],x0380
+0387: 17 09 [0 w-0 r-6 (06)]          move    sliv,r11
+0388: 69 09 [0 w-0 r-0 (00)]  x0388:  xor     r11,r11
+0389: a9 5d [0 w-0 r-0 (00)]          nzt     r11,x035d
+038a: 01 00 [0 w-0 r-0 (00)]          move    r1,aux
+038b: b5 2b [0 w-0 r-5 (05)]  x038b:  nzt     sliv[2],x038b
+038c: 17 09 [0 w-0 r-6 (06)]          move    sliv,r11
+038d: 69 09 [0 w-0 r-0 (00)]          xor     r11,r11
+038e: a9 5d [0 w-0 r-0 (00)]          nzt     r11,x035d
+038f: 02 00 [0 w-0 r-0 (00)]          move    r2,aux
+0390: b5 30 [0 w-0 r-5 (05)]  x0390:  nzt     sliv[2],x0390
+0391: c7 55 [0 w-0 r-0 (00)]          xmit    55h,ivl
+0392: 17 09 [0 w-0 r-6 (06)]          move    sliv,r11
+0393: 69 09 [0 w-0 r-0 (00)]          xor     r11,r11
+0394: a9 5d [0 w-0 r-0 (00)]          nzt     r11,x035d
+0395: 03 00 [0 w-0 r-0 (00)]          move    r3,aux
+0396: b5 36 [0 w-0 r-5 (05)]  x0396:  nzt     sliv[2],x0396
+0397: 17 09 [0 w-0 r-6 (06)]          move    sliv,r11
+0398: 69 09 [0 w-0 r-0 (00)]          xor     r11,r11
+0399: a9 5d [0 w-0 r-0 (00)]          nzt     r11,x035d
+039a: b5 3a [0 w-0 r-5 (05)]  x039a:  nzt     sliv[2],x039a
+039b: 17 09 [0 w-0 r-6 (06)]          move    sliv,r11
+039c: a9 5d [0 w-0 r-0 (00)]          nzt     r11,x035d
+039d: b5 3d [0 w-0 r-5 (05)]  x039d:  nzt     sliv[2],x039d
+039e: 17 09 [0 w-0 r-6 (06)]          move    sliv,r11
+039f: a9 5d [0 w-0 r-0 (00)]          nzt     r11,x035d
+03a0: c7 20 [0 w-d r-0 (68)]          xmit    20h,ivl
+03a1: c7 34 [0 w-0 r-0 (00)]          xmit    34h,ivl
+03a2: e3 a3 [0 w-0 r-0 (00)]          jmp     x03a3
+03a3: b0 30 [0 w-0 r-3 (03)]  x03a3:  nzt     sliv[7],x03b0
+03a4: a4 a6 [0 w-0 r-0 (00)]          nzt     r4,x03a6
+03a5: e3 c0 [0 w-0 r-0 (00)]          jmp     x03c0
+03a6: e4 30 [0 w-0 r-0 (00)]  x03a6:  jmp     x0430
+03a7: c7 20 [0 w-d r-0 (68)]  x03a7:  xmit    20h,ivl
+03a8: c7 34 [0 w-0 r-0 (00)]          xmit    34h,ivl
+03a9: c7 00 [0 w-7 r-0 (38)]          xmit    0h,ivl
+03aa: c0 01 [0 w-0 r-0 (00)]          xmit    1h,aux
+03ab: 25 05 [0 w-0 r-0 (00)]          add     r5,r5
+03ac: a8 ae [0 w-0 r-0 (00)]          nzt     ovf,x03ae
+03ad: e3 5c [0 w-0 r-0 (00)]          jmp     x035c
+03ae: c6 22 [0 w-0 r-0 (00)]  x03ae:  xmit    22h,r6
+03af: e3 b3 [0 w-0 r-0 (00)]          jmp     x03b3
+03b0: c7 20 [0 w-d r-0 (68)]  x03b0:  xmit    20h,ivl
+03b1: c7 34 [0 w-0 r-0 (00)]          xmit    34h,ivl
+03b2: c6 23 [0 w-0 r-0 (00)]          xmit    23h,r6
+03b3: c7 08 [0 w-c r-0 (60)]  x03b3:  xmit    8h,ivl
+03b4: c7 c4 [0 w-b r-0 (58)]          xmit    0c4h,ivl
+03b5: 17 09 [1 w-0 r-2 (82)]  x03b5:  move    sliv,r11
+03b6: 06 07 [0 w-2 r-0 (10)]  x03b6:  move    r6,ivl
+03b7: e0 1c [0 w-0 r-0 (00)]          jmp     x001c
+03b8: 2a 2a [0 w-5 r-2 (2a)]          add     r12>>>1,r12
+03b9: 66 66 [0 w-c r-6 (66)]          xor     r6>>>3,r6
+03ba: 50 50 [0 w-a r-0 (50)]          and     sliv[8:7],dliv[8:7]
+03bb: 96 96 [1 w-2 r-6 (96)]          xec     x03b6,sliv[4:1]
+03bc: 7f 7f [0 w-f r-7 (7f)]          xor     sriv[2:0],driv[2:0]
+03bd: 83 83 [1 w-0 r-3 (83)]          xec     x0383,r3
+03be: bf bf [1 w-7 r-7 (bf)]          nzt     sriv[4:0],x03bf
+03bf: 95 95 [1 w-2 r-5 (95)]  x03bf:  xec     x03b5,sliv[5:2]
+03c0: c7 08 [0 w-c r-0 (60)]  x03c0:  xmit    8h,ivl
+03c1: c7 43 [0 w-b r-0 (58)]          xmit    43h,ivl
+03c2: 17 04 [1 w-0 r-2 (82)]          move    sliv,r4
+03c3: c7 0d [0 w-c r-0 (60)]          xmit    0dh,ivl
+03c4: c7 00 [0 w-b r-0 (58)]          xmit    0h,ivl
+03c5: c5 40 [0 w-0 r-0 (00)]          xmit    40h,r5
+03c6: c0 01 [0 w-0 r-0 (00)]          xmit    1h,aux
+03c7: c1 f9 [0 w-0 r-0 (00)]          xmit    0f9h,r1
+03c8: 21 01 [0 w-0 r-0 (00)]  x03c8:  add     r1,r1
+03c9: a1 c8 [0 w-0 r-0 (00)]          nzt     r1,x03c8
+03ca: c7 40 [0 w-d r-0 (68)]          xmit    40h,ivl
+03cb: e3 cd [0 w-0 r-0 (00)]          jmp     x03cd
+03cc: e4 1e [0 w-0 r-0 (00)]  x03cc:  jmp     x041e
+03cd: b7 2c [0 w-0 r-3 (03)]  x03cd:  nzt     sliv[0],x03cc
+03ce: b2 31 [0 w-0 r-3 (03)]          nzt     sliv[5],x03d1
+03cf: b0 2c [0 w-0 r-3 (03)]          nzt     sliv[7],x03cc
+03d0: e3 cd [0 w-0 r-0 (00)]          jmp     x03cd
+03d1: c9 f6 [0 w-0 r-0 (00)]  x03d1:  xmit    0f6h,r11
+03d2: c0 01 [0 w-0 r-0 (00)]          xmit    1h,aux
+03d3: 29 09 [0 w-0 r-0 (00)]  x03d3:  add     r11,r11
+03d4: a9 d3 [0 w-0 r-0 (00)]          nzt     r11,x03d3
+03d5: c7 74 [0 w-0 r-0 (00)]          xmit    74h,ivl
+03d6: c9 fb [0 w-0 r-0 (00)]          xmit    0fbh,r11
+03d7: 29 09 [0 w-0 r-0 (00)]  x03d7:  add     r11,r11
+03d8: a9 d7 [0 w-0 r-0 (00)]          nzt     r11,x03d7
+03d9: c7 64 [0 w-0 r-0 (00)]          xmit    64h,ivl
+03da: c7 74 [0 w-0 r-0 (00)]          xmit    74h,ivl
+03db: 17 09 [0 w-0 r-6 (06)]          move    sliv,r11
+03dc: c0 f8 [0 w-0 r-0 (00)]          xmit    0f8h,aux
+03dd: 17 09 [0 w-0 r-6 (06)]          move    sliv,r11
+03de: e3 e5 [0 w-0 r-0 (00)]          jmp     x03e5
+03df: 01 01 [0 w-0 r-0 (00)]          move    r1,r1
+03e0: e4 20 [0 w-0 r-0 (00)]  x03e0:  jmp     x0420
+03e1: e4 07 [0 w-0 r-0 (00)]  x03e1:  jmp     x0407
+03e2: e4 03 [0 w-0 r-0 (00)]          jmp     x0403
+03e3: e4 1e [0 w-0 r-0 (00)]  x03e3:  jmp     x041e
+03e4: e4 22 [0 w-0 r-0 (00)]          jmp     x0422
+03e5: b5 25 [0 w-0 r-5 (05)]  x03e5:  nzt     sliv[2],x03e5
+03e6: b0 23 [0 w-0 r-3 (03)]          nzt     sliv[7],x03e3
+03e7: 17 09 [0 w-0 r-6 (06)]          move    sliv,r11
+03e8: 69 09 [0 w-0 r-0 (00)]          xor     r11,r11
+03e9: a9 e0 [0 w-0 r-0 (00)]          nzt     r11,x03e0
+03ea: c0 ff [0 w-0 r-0 (00)]          xmit    0ffh,aux
+03eb: b5 2b [0 w-0 r-5 (05)]  x03eb:  nzt     sliv[2],x03eb
+03ec: 10 10 [0 w-2 r-6 (16)]          move    sliv[14:7],dliv[14:7]
+03ed: 25 05 [0 w-0 r-0 (00)]          add     r5,r5
+03ee: b5 2e [0 w-0 r-5 (05)]  x03ee:  nzt     sliv[2],x03ee
+03ef: 10 10 [0 w-2 r-6 (16)]          move    sliv[14:7],dliv[14:7]
+03f0: 26 06 [0 w-0 r-0 (00)]          add     r6,r6
+03f1: a6 f4 [0 w-0 r-0 (00)]          nzt     r6,x03f4
+03f2: a4 e1 [0 w-0 r-0 (00)]          nzt     r4,x03e1
+03f3: e4 03 [0 w-0 r-0 (00)]          jmp     x0403
+03f4: b5 34 [0 w-0 r-5 (05)]  x03f4:  nzt     sliv[2],x03f4
+03f5: 10 10 [0 w-2 r-6 (16)]          move    sliv[14:7],dliv[14:7]
+03f6: a5 f8 [0 w-0 r-0 (00)]          nzt     r5,x03f8
+03f7: e4 09 [0 w-0 r-0 (00)]          jmp     x0409
+03f8: b5 38 [0 w-0 r-5 (05)]  x03f8:  nzt     sliv[2],x03f8
+03f9: 10 10 [0 w-2 r-6 (16)]          move    sliv[14:7],dliv[14:7]
+03fa: e3 eb [0 w-0 r-0 (00)]          jmp     x03eb
+03fb: c7 0e [0 w-c r-0 (60)]  x03fb:  xmit    0eh,ivl
+03fc: b5 3c [0 w-0 r-5 (05)]  x03fc:  nzt     sliv[2],x03fc
+03fd: 10 10 [0 w-2 r-6 (16)]          move    sliv[14:7],dliv[14:7]
+03fe: 26 06 [0 w-0 r-0 (00)]          add     r6,r6
+03ff: b5 3f [0 w-0 r-5 (05)]  x03ff:  nzt     sliv[2],x03ff
+0400: 10 10 [0 w-2 r-6 (16)]          move    sliv[14:7],dliv[14:7]
+0401: a6 07 [0 w-0 r-0 (00)]          nzt     r6,x0407
+0402: a4 07 [0 w-0 r-0 (00)]          nzt     r4,x0407
+0403: b5 23 [0 w-0 r-5 (05)]  x0403:  nzt     sliv[2],x0403
+0404: 10 10 [0 w-2 r-6 (16)]          move    sliv[14:7],dliv[14:7]
+0405: c7 54 [0 w-0 r-0 (00)]          xmit    54h,ivl
+0406: e4 09 [0 w-0 r-0 (00)]          jmp     x0409
+0407: b5 27 [0 w-0 r-5 (05)]  x0407:  nzt     sliv[2],x0407
+0408: 10 10 [0 w-2 r-6 (16)]          move    sliv[14:7],dliv[14:7]
+0409: b5 29 [0 w-0 r-5 (05)]  x0409:  nzt     sliv[2],x0409
+040a: 10 10 [0 w-2 r-6 (16)]          move    sliv[14:7],dliv[14:7]
+040b: a6 1d [0 w-0 r-0 (00)]          nzt     r6,x041d
+040c: b5 2c [0 w-0 r-5 (05)]  x040c:  nzt     sliv[2],x040c
+040d: 17 01 [0 w-0 r-6 (06)]          move    sliv,r1
+040e: b5 2e [0 w-0 r-5 (05)]  x040e:  nzt     sliv[2],x040e
+040f: 17 02 [0 w-0 r-6 (06)]          move    sliv,r2
+0410: b5 30 [0 w-0 r-5 (05)]  x0410:  nzt     sliv[2],x0410
+0411: 17 03 [0 w-0 r-6 (06)]          move    sliv,r3
+0412: b5 32 [0 w-0 r-5 (05)]  x0412:  nzt     sliv[2],x0412
+0413: 17 05 [0 w-0 r-6 (06)]          move    sliv,r5
+0414: c7 20 [0 w-d r-0 (68)]          xmit    20h,ivl
+0415: b0 3e [0 w-0 r-3 (03)]          nzt     sliv[7],x041e
+0416: a4 24 [0 w-0 r-0 (00)]          nzt     r4,x0424
+0417: a1 22 [0 w-0 r-0 (00)]          nzt     r1,x0422
+0418: a2 22 [0 w-0 r-0 (00)]          nzt     r2,x0422
+0419: a3 22 [0 w-0 r-0 (00)]          nzt     r3,x0422
+041a: a5 22 [0 w-0 r-0 (00)]          nzt     r5,x0422
+041b: c6 00 [0 w-0 r-0 (00)]          xmit    0h,r6
+041c: e4 24 [0 w-0 r-0 (00)]          jmp     x0424
+041d: e3 fb [0 w-0 r-0 (00)]  x041d:  jmp     x03fb
+041e: c6 28 [0 w-0 r-0 (00)]  x041e:  xmit    28h,r6
+041f: e4 24 [0 w-0 r-0 (00)]          jmp     x0424
+0420: c6 29 [0 w-0 r-0 (00)]  x0420:  xmit    29h,r6
+0421: e4 24 [0 w-0 r-0 (00)]          jmp     x0424
+0422: c6 21 [0 w-0 r-0 (00)]  x0422:  xmit    21h,r6
+0423: e4 24 [0 w-0 r-0 (00)]          jmp     x0424
+0424: c7 20 [0 w-d r-0 (68)]  x0424:  xmit    20h,ivl
+0425: c7 34 [0 w-0 r-0 (00)]          xmit    34h,ivl
+0426: c7 08 [0 w-c r-0 (60)]          xmit    8h,ivl
+0427: c7 14 [0 w-b r-0 (58)]          xmit    14h,ivl
+0428: 01 07 [0 w-2 r-0 (10)]          move    r1,ivl
+0429: 02 07 [0 w-2 r-0 (10)]          move    r2,ivl
+042a: 03 07 [0 w-2 r-0 (10)]          move    r3,ivl
+042b: 05 07 [0 w-2 r-0 (10)]          move    r5,ivl
+042c: c7 c4 [0 w-b r-0 (58)]          xmit    0c4h,ivl
+042d: 17 09 [1 w-0 r-2 (82)]          move    sliv,r11
+042e: 06 07 [0 w-2 r-0 (10)]          move    r6,ivl
+042f: e0 1c [0 w-0 r-0 (00)]          jmp     x001c
+0430: c7 08 [0 w-c r-0 (60)]  x0430:  xmit    8h,ivl
+0431: c7 43 [0 w-b r-0 (58)]          xmit    43h,ivl
+0432: 17 01 [1 w-0 r-2 (82)]          move    sliv,r1
+0433: c7 41 [0 w-b r-0 (58)]          xmit    41h,ivl
+0434: 17 05 [1 w-0 r-2 (82)]          move    sliv,r5
+0435: c7 00 [0 w-1 r-0 (08)]          xmit    0h,ivl
+0436: c7 34 [0 w-0 r-0 (00)]          xmit    34h,ivl
+0437: 05 07 [0 w-d r-0 (68)]          move    r5,ivl
+0438: b5 38 [0 w-0 r-5 (05)]  x0438:  nzt     sliv[2],x0438
+0439: c7 00 [0 w-1 r-0 (08)]          xmit    0h,ivl
+043a: 01 05 [0 w-0 r-0 (00)]          move    r1,r5
+043b: b5 3b [0 w-0 r-5 (05)]  x043b:  nzt     sliv[2],x043b
+043c: c7 00 [0 w-1 r-0 (08)]          xmit    0h,ivl
+043d: b5 3d [0 w-0 r-5 (05)]  x043d:  nzt     sliv[2],x043d
+043e: c7 00 [0 w-1 r-0 (08)]          xmit    0h,ivl
+043f: b5 3f [0 w-0 r-5 (05)]  x043f:  nzt     sliv[2],x043f
+0440: c7 00 [0 w-1 r-0 (08)]          xmit    0h,ivl
+0441: b5 21 [0 w-0 r-5 (05)]  x0441:  nzt     sliv[2],x0441
+0442: c7 00 [0 w-1 r-0 (08)]          xmit    0h,ivl
+0443: b5 23 [0 w-0 r-5 (05)]  x0443:  nzt     sliv[2],x0443
+0444: c7 00 [0 w-1 r-0 (08)]          xmit    0h,ivl
+0445: b5 25 [0 w-0 r-5 (05)]  x0445:  nzt     sliv[2],x0445
+0446: c7 00 [0 w-1 r-0 (08)]          xmit    0h,ivl
+0447: b5 27 [0 w-0 r-5 (05)]  x0447:  nzt     sliv[2],x0447
+0448: c7 00 [0 w-1 r-0 (08)]          xmit    0h,ivl
+0449: c7 0d [0 w-c r-0 (60)]          xmit    0dh,ivl
+044a: b5 2a [0 w-0 r-5 (05)]  x044a:  nzt     sliv[2],x044a
+044b: c7 00 [0 w-1 r-0 (08)]          xmit    0h,ivl
+044c: c7 00 [0 w-b r-0 (58)]          xmit    0h,ivl
+044d: c0 ff [0 w-0 r-0 (00)]          xmit    0ffh,aux
+044e: b5 2e [0 w-0 r-5 (05)]  x044e:  nzt     sliv[2],x044e
+044f: c7 00 [0 w-1 r-0 (08)]          xmit    0h,ivl
+0450: c7 24 [0 w-0 r-0 (00)]          xmit    24h,ivl
+0451: b5 31 [0 w-0 r-5 (05)]  x0451:  nzt     sliv[2],x0451
+0452: c7 00 [0 w-1 r-0 (08)]          xmit    0h,ivl
+0453: c7 34 [0 w-0 r-0 (00)]          xmit    34h,ivl
+0454: b5 34 [0 w-0 r-5 (05)]  x0454:  nzt     sliv[2],x0454
+0455: c7 00 [0 w-1 r-0 (08)]          xmit    0h,ivl
+0456: b5 36 [0 w-0 r-5 (05)]  x0456:  nzt     sliv[2],x0456
+0457: c7 00 [0 w-1 r-0 (08)]          xmit    0h,ivl
+0458: b5 38 [0 w-0 r-5 (05)]  x0458:  nzt     sliv[2],x0458
+0459: c7 a1 [0 w-1 r-0 (08)]          xmit    0a1h,ivl
+045a: b5 3a [0 w-0 r-5 (05)]  x045a:  nzt     sliv[2],x045a
+045b: c7 f8 [0 w-1 r-0 (08)]          xmit    0f8h,ivl
+045c: c9 40 [0 w-0 r-0 (00)]          xmit    40h,r11
+045d: b5 3d [0 w-0 r-5 (05)]  x045d:  nzt     sliv[2],x045d
+045e: 10 10 [1 w-1 r-2 (8a)]          move    sliv[14:7],dliv[14:7]
+045f: 29 09 [0 w-0 r-0 (00)]          add     r11,r11
+0460: b5 20 [0 w-0 r-5 (05)]  x0460:  nzt     sliv[2],x0460
+0461: 10 10 [1 w-1 r-2 (8a)]          move    sliv[14:7],dliv[14:7]
+0462: 26 06 [0 w-0 r-0 (00)]          add     r6,r6
+0463: b5 23 [0 w-0 r-5 (05)]  x0463:  nzt     sliv[2],x0463
+0464: 10 10 [1 w-1 r-2 (8a)]          move    sliv[14:7],dliv[14:7]
+0465: a9 67 [0 w-0 r-0 (00)]          nzt     r11,x0467
+0466: e4 93 [0 w-0 r-0 (00)]          jmp     x0493
+0467: b5 27 [0 w-0 r-5 (05)]  x0467:  nzt     sliv[2],x0467
+0468: 10 10 [1 w-1 r-2 (8a)]          move    sliv[14:7],dliv[14:7]
+0469: a6 5d [0 w-0 r-0 (00)]          nzt     r6,x045d
+046a: a5 6c [0 w-0 r-0 (00)]          nzt     r5,x046c
+046b: e4 77 [0 w-0 r-0 (00)]          jmp     x0477
+046c: c7 08 [0 w-c r-0 (60)]  x046c:  xmit    8h,ivl
+046d: c7 14 [0 w-b r-0 (58)]          xmit    14h,ivl
+046e: b5 2e [0 w-0 r-5 (05)]  x046e:  nzt     sliv[2],x046e
+046f: 10 10 [1 w-1 r-2 (8a)]          move    sliv[14:7],dliv[14:7]
+0470: b5 30 [0 w-0 r-5 (05)]  x0470:  nzt     sliv[2],x0470
+0471: 10 10 [1 w-1 r-2 (8a)]          move    sliv[14:7],dliv[14:7]
+0472: b5 32 [0 w-0 r-5 (05)]  x0472:  nzt     sliv[2],x0472
+0473: 10 10 [1 w-1 r-2 (8a)]          move    sliv[14:7],dliv[14:7]
+0474: b5 34 [0 w-0 r-5 (05)]  x0474:  nzt     sliv[2],x0474
+0475: 10 10 [1 w-1 r-2 (8a)]          move    sliv[14:7],dliv[14:7]
+0476: e4 80 [0 w-0 r-0 (00)]          jmp     x0480
+0477: b5 37 [0 w-0 r-5 (05)]  x0477:  nzt     sliv[2],x0477
+0478: c7 00 [0 w-1 r-0 (08)]          xmit    0h,ivl
+0479: c7 14 [0 w-0 r-0 (00)]          xmit    14h,ivl
+047a: b5 3a [0 w-0 r-5 (05)]  x047a:  nzt     sliv[2],x047a
+047b: c7 00 [0 w-1 r-0 (08)]          xmit    0h,ivl
+047c: b5 3c [0 w-0 r-5 (05)]  x047c:  nzt     sliv[2],x047c
+047d: c7 00 [0 w-1 r-0 (08)]          xmit    0h,ivl
+047e: b5 3e [0 w-0 r-5 (05)]  x047e:  nzt     sliv[2],x047e
+047f: c7 00 [0 w-1 r-0 (08)]          xmit    0h,ivl
+0480: b5 20 [0 w-0 r-5 (05)]  x0480:  nzt     sliv[2],x0480
+0481: c7 00 [0 w-1 r-0 (08)]          xmit    0h,ivl
+0482: b5 22 [0 w-0 r-5 (05)]  x0482:  nzt     sliv[2],x0482
+0483: c7 00 [0 w-1 r-0 (08)]          xmit    0h,ivl
+0484: c7 34 [0 w-0 r-0 (00)]          xmit    34h,ivl
+0485: c7 20 [0 w-d r-0 (68)]          xmit    20h,ivl
+0486: b0 29 [0 w-0 r-3 (03)]          nzt     sliv[7],x0489
+0487: c6 00 [0 w-0 r-0 (00)]          xmit    0h,r6
+0488: e4 98 [0 w-0 r-0 (00)]          jmp     x0498
+0489: c6 25 [0 w-0 r-0 (00)]  x0489:  xmit    25h,r6
+048a: e4 98 [0 w-0 r-0 (00)]          jmp     x0498
+048b: c7 0e [0 w-c r-0 (60)]  x048b:  xmit    0eh,ivl
+048c: b5 2c [0 w-0 r-5 (05)]  x048c:  nzt     sliv[2],x048c
+048d: 10 10 [1 w-1 r-2 (8a)]          move    sliv[14:7],dliv[14:7]
+048e: 26 06 [0 w-0 r-0 (00)]          add     r6,r6
+048f: b5 2f [0 w-0 r-5 (05)]  x048f:  nzt     sliv[2],x048f
+0490: 10 10 [1 w-1 r-2 (8a)]          move    sliv[14:7],dliv[14:7]
+0491: b5 31 [0 w-0 r-5 (05)]  x0491:  nzt     sliv[2],x0491
+0492: 10 10 [1 w-1 r-2 (8a)]          move    sliv[14:7],dliv[14:7]
+0493: b5 33 [0 w-0 r-5 (05)]  x0493:  nzt     sliv[2],x0493
+0494: 10 10 [1 w-1 r-2 (8a)]          move    sliv[14:7],dliv[14:7]
+0495: a6 8b [0 w-0 r-0 (00)]          nzt     r6,x048b
+0496: a5 6c [0 w-0 r-0 (00)]          nzt     r5,x046c
+0497: e4 77 [0 w-0 r-0 (00)]          jmp     x0477
+0498: c7 08 [0 w-c r-0 (60)]  x0498:  xmit    8h,ivl
+0499: c7 c4 [0 w-b r-0 (58)]          xmit    0c4h,ivl
+049a: 17 09 [1 w-0 r-2 (82)]          move    sliv,r11
+049b: 06 07 [0 w-2 r-0 (10)]          move    r6,ivl
+049c: e0 1c [0 w-0 r-0 (00)]          jmp     x001c
+049d: 42 42 [0 w-8 r-2 (42)]          and     r2>>>2,r2
+049e: 3f 3f [0 w-7 r-7 (3f)]          add     sriv[0],driv[0]
+049f: 30 30 [0 w-6 r-0 (30)]          add     sliv[7],dliv[7]
+04a0: c7 03 [0 w-b r-0 (58)]  x04a0:  xmit    3h,ivl
+04a1: 17 01 [1 w-0 r-2 (82)]          move    sliv,r1
+04a2: c7 a0 [0 w-b r-0 (58)]          xmit    0a0h,ivl
+04a3: 17 05 [1 w-0 r-2 (82)]          move    sliv,r5
+04a4: 17 04 [1 w-0 r-2 (82)]          move    sliv,r4
+04a5: 17 03 [1 w-0 r-2 (82)]          move    sliv,r3
+04a6: 17 02 [1 w-0 r-2 (82)]          move    sliv,r2
+04a7: c7 47 [0 w-b r-0 (58)]          xmit    47h,ivl
+04a8: 17 09 [1 w-0 r-2 (82)]          move    sliv,r11
+04a9: a9 af [0 w-0 r-0 (00)]          nzt     r11,x04af
+04aa: c0 34 [0 w-0 r-0 (00)]          xmit    34h,aux
+04ab: 21 09 [0 w-0 r-0 (00)]          add     r1,r11
+04ac: 09 07 [0 w-b r-0 (58)]          move    r11,ivl
+04ad: 17 09 [1 w-0 r-2 (82)]          move    sliv,r11
+04ae: a9 b0 [0 w-0 r-0 (00)]          nzt     r11,x04b0
+04af: e4 f9 [0 w-0 r-0 (00)]  x04af:  jmp     x04f9
+04b0: c7 08 [0 w-c r-0 (60)]  x04b0:  xmit    8h,ivl
+04b1: c7 a8 [0 w-b r-0 (58)]          xmit    0a8h,ivl
+04b2: 17 09 [1 w-0 r-2 (82)]          move    sliv,r11
+04b3: c7 03 [0 w-b r-0 (58)]          xmit    3h,ivl
+04b4: 17 01 [1 w-0 r-2 (82)]          move    sliv,r1
+04b5: 81 bf [0 w-0 r-0 (00)]          xec     x04bf,r1
+04b6: 09 01 [0 w-0 r-0 (00)]          move    r11,r1
+04b7: c7 00 [0 w-b r-0 (58)]          xmit    0h,ivl
+04b8: c6 00 [0 w-0 r-0 (00)]          xmit    0h,r6
+04b9: 17 00 [1 w-0 r-2 (82)]  x04b9:  move    sliv,aux
+04ba: c9 e5 [0 w-0 r-0 (00)]          xmit    0e5h,r11
+04bb: 69 09 [0 w-0 r-0 (00)]          xor     r11,r11
+04bc: a9 c3 [0 w-0 r-0 (00)]          nzt     r11,x04c3
+04bd: c6 00 [0 w-0 r-0 (00)]  x04bd:  xmit    0h,r6
+04be: e5 57 [0 w-0 r-0 (00)]          jmp     x0557
+04bf: c7 09 [0 w-c r-0 (60)]  x04bf:  xmit    9h,ivl
+04c0: c7 0a [0 w-c r-0 (60)]          xmit    0ah,ivl
+04c1: c7 0b [0 w-c r-0 (60)]          xmit    0bh,ivl
+04c2: c7 0c [0 w-c r-0 (60)]          xmit    0ch,ivl
+04c3: 62 09 [0 w-0 r-0 (00)]  x04c3:  xor     r2,r11
+04c4: a9 ed [0 w-0 r-0 (00)]          nzt     r11,x04ed
+04c5: 17 00 [1 w-0 r-2 (82)]          move    sliv,aux
+04c6: 63 09 [0 w-0 r-0 (00)]          xor     r3,r11
+04c7: a9 ee [0 w-0 r-0 (00)]          nzt     r11,x04ee
+04c8: 17 00 [1 w-0 r-2 (82)]          move    sliv,aux
+04c9: 64 09 [0 w-0 r-0 (00)]          xor     r4,r11
+04ca: a9 ef [0 w-0 r-0 (00)]          nzt     r11,x04ef
+04cb: 17 00 [1 w-0 r-2 (82)]          move    sliv,aux
+04cc: 65 09 [0 w-0 r-0 (00)]          xor     r5,r11
+04cd: a9 f0 [0 w-0 r-0 (00)]          nzt     r11,x04f0
+04ce: c7 08 [0 w-c r-0 (60)]          xmit    8h,ivl
+04cf: c7 a9 [0 w-b r-0 (58)]          xmit    0a9h,ivl
+04d0: 17 01 [1 w-0 r-2 (82)]          move    sliv,r1
+04d1: 17 02 [1 w-0 r-2 (82)]          move    sliv,r2
+04d2: c3 00 [0 w-0 r-0 (00)]          xmit    0h,r3
+04d3: c4 01 [0 w-0 r-0 (00)]          xmit    1h,r4
+04d4: c5 01 [0 w-0 r-0 (00)]          xmit    1h,r5
+04d5: a6 d7 [0 w-0 r-0 (00)]  x04d5:  nzt     r6,x04d7
+04d6: e4 e8 [0 w-0 r-0 (00)]          jmp     x04e8
+04d7: c0 01 [0 w-0 r-0 (00)]  x04d7:  xmit    1h,aux
+04d8: 25 05 [0 w-0 r-0 (00)]          add     r5,r5
+04d9: 01 00 [0 w-0 r-0 (00)]          move    r1,aux
+04da: 65 09 [0 w-0 r-0 (00)]          xor     r5,r11
+04db: a9 e5 [0 w-0 r-0 (00)]          nzt     r11,x04e5
+04dc: c5 00 [0 w-0 r-0 (00)]          xmit    0h,r5
+04dd: c0 01 [0 w-0 r-0 (00)]          xmit    1h,aux
+04de: 24 04 [0 w-0 r-0 (00)]          add     r4,r4
+04df: 02 00 [0 w-0 r-0 (00)]          move    r2,aux
+04e0: 64 09 [0 w-0 r-0 (00)]          xor     r4,r11
+04e1: a9 e5 [0 w-0 r-0 (00)]          nzt     r11,x04e5
+04e2: c4 00 [0 w-0 r-0 (00)]          xmit    0h,r4
+04e3: c0 01 [0 w-0 r-0 (00)]          xmit    1h,aux
+04e4: 23 03 [0 w-0 r-0 (00)]          add     r3,r3
+04e5: c0 ff [0 w-0 r-0 (00)]  x04e5:  xmit    0ffh,aux
+04e6: 26 06 [0 w-0 r-0 (00)]          add     r6,r6
+04e7: e4 d5 [0 w-0 r-0 (00)]          jmp     x04d5
+04e8: c2 00 [0 w-0 r-0 (00)]  x04e8:  xmit    0h,r2
+04e9: c7 3c [0 w-b r-0 (58)]          xmit    3ch,ivl
+04ea: c7 20 [0 w-2 r-0 (10)]          xmit    20h,ivl
+04eb: c6 00 [0 w-0 r-0 (00)]          xmit    0h,r6
+04ec: e5 57 [0 w-0 r-0 (00)]          jmp     x0557
+04ed: 17 09 [1 w-0 r-2 (82)]  x04ed:  move    sliv,r11
+04ee: 17 09 [1 w-0 r-2 (82)]  x04ee:  move    sliv,r11
+04ef: 17 09 [1 w-0 r-2 (82)]  x04ef:  move    sliv,r11
+04f0: c0 01 [0 w-0 r-0 (00)]  x04f0:  xmit    1h,aux
+04f1: 26 06 [0 w-0 r-0 (00)]          add     r6,r6
+04f2: c0 20 [0 w-0 r-0 (00)]          xmit    20h,aux
+04f3: 41 09 [0 w-0 r-0 (00)]          and     r1,r11
+04f4: a9 f6 [0 w-0 r-0 (00)]          nzt     r11,x04f6
+04f5: c0 40 [0 w-0 r-0 (00)]          xmit    40h,aux
+04f6: 66 09 [0 w-0 r-0 (00)]  x04f6:  xor     r6,r11
+04f7: a9 b9 [0 w-0 r-0 (00)]          nzt     r11,x04b9
+04f8: e4 bd [0 w-0 r-0 (00)]          jmp     x04bd
+04f9: c7 08 [0 w-c r-0 (60)]  x04f9:  xmit    8h,ivl
+04fa: c7 a4 [0 w-b r-0 (58)]          xmit    0a4h,ivl
+04fb: 05 07 [0 w-2 r-0 (10)]          move    r5,ivl
+04fc: 04 07 [0 w-2 r-0 (10)]          move    r4,ivl
+04fd: 03 07 [0 w-2 r-0 (10)]          move    r3,ivl
+04fe: 02 07 [0 w-2 r-0 (10)]          move    r2,ivl
+04ff: c7 38 [0 w-b r-0 (58)]          xmit    38h,ivl
+0500: c7 00 [0 w-2 r-0 (10)]          xmit    0h,ivl
+0501: c7 08 [0 w-c r-0 (60)]  x0501:  xmit    8h,ivl
+0502: c7 38 [0 w-b r-0 (58)]          xmit    38h,ivl
+0503: 17 01 [1 w-0 r-2 (82)]          move    sliv,r1
+0504: c7 a0 [0 w-b r-0 (58)]          xmit    0a0h,ivl
+0505: c7 00 [0 w-2 r-0 (10)]          xmit    0h,ivl
+0506: 01 07 [0 w-2 r-0 (10)]          move    r1,ivl
+0507: c7 00 [0 w-2 r-0 (10)]          xmit    0h,ivl
+0508: c7 00 [0 w-2 r-0 (10)]          xmit    0h,ivl
+0509: c7 c2 [0 w-b r-0 (58)]          xmit    0c2h,ivl
+050a: c7 00 [0 w-2 r-0 (10)]          xmit    0h,ivl
+050b: c7 48 [0 w-b r-0 (58)]          xmit    48h,ivl
+050c: c7 01 [0 w-2 r-0 (10)]          xmit    1h,ivl
+050d: e1 04 [0 w-0 r-0 (00)]          jmp     x0104
+050e: c7 48 [0 w-b r-0 (58)]  x050e:  xmit    48h,ivl
+050f: c7 00 [0 w-2 r-0 (10)]          xmit    0h,ivl
+0510: a6 5d [0 w-0 r-0 (00)]          nzt     r6,x055d
+0511: c7 a8 [0 w-b r-0 (58)]          xmit    0a8h,ivl
+0512: 17 06 [1 w-0 r-2 (82)]          move    sliv,r6
+0513: c1 00 [0 w-0 r-0 (00)]          xmit    0h,r1
+0514: c7 38 [0 w-b r-0 (58)]          xmit    38h,ivl
+0515: 17 02 [1 w-0 r-2 (82)]          move    sliv,r2
+0516: c3 00 [0 w-0 r-0 (00)]          xmit    0h,r3
+0517: c4 00 [0 w-0 r-0 (00)]          xmit    0h,r4
+0518: c7 c4 [0 w-b r-0 (58)]          xmit    0c4h,ivl
+0519: c7 04 [0 w-2 r-0 (10)]          xmit    4h,ivl
+051a: e3 58 [0 w-0 r-0 (00)]          jmp     x0358
+051b: c7 08 [0 w-c r-0 (60)]  x051b:  xmit    8h,ivl
+051c: a6 43 [0 w-0 r-0 (00)]          nzt     r6,x0543
+051d: c7 03 [0 w-b r-0 (58)]          xmit    3h,ivl
+051e: 17 01 [1 w-0 r-2 (82)]          move    sliv,r1
+051f: 81 62 [0 w-0 r-0 (00)]          xec     x0562,r1
+0520: c3 00 [0 w-0 r-0 (00)]          xmit    0h,r3
+0521: c0 01 [0 w-0 r-0 (00)]          xmit    1h,aux
+0522: c5 00 [0 w-0 r-0 (00)]          xmit    0h,r5
+0523: c7 0d [0 w-c r-0 (60)]  x0523:  xmit    0dh,ivl
+0524: 03 07 [0 w-b r-0 (58)]          move    r3,ivl
+0525: 17 00 [1 w-0 r-2 (82)]          move    sliv,aux
+0526: 02 07 [0 w-c r-0 (60)]          move    r2,ivl
+0527: 03 07 [0 w-b r-0 (58)]          move    r3,ivl
+0528: 00 07 [0 w-2 r-0 (10)]          move    aux,ivl
+0529: 25 05 [0 w-0 r-0 (00)]          add     r5,r5
+052a: c0 01 [0 w-0 r-0 (00)]          xmit    1h,aux
+052b: 23 03 [0 w-0 r-0 (00)]          add     r3,r3
+052c: a3 23 [0 w-0 r-0 (00)]          nzt     r3,x0523
+052d: c7 08 [0 w-c r-0 (60)]          xmit    8h,ivl
+052e: c7 03 [0 w-b r-0 (58)]          xmit    3h,ivl
+052f: 17 01 [1 w-0 r-2 (82)]          move    sliv,r1
+0530: c0 34 [0 w-0 r-0 (00)]          xmit    34h,aux
+0531: 21 09 [0 w-0 r-0 (00)]          add     r1,r11
+0532: 09 07 [0 w-b r-0 (58)]          move    r11,ivl
+0533: c7 01 [0 w-2 r-0 (10)]          xmit    1h,ivl
+0534: c0 90 [0 w-0 r-0 (00)]          xmit    90h,aux
+0535: 21 09 [0 w-0 r-0 (00)]          add     r1,r11
+0536: 09 07 [0 w-b r-0 (58)]          move    r11,ivl
+0537: 05 07 [0 w-2 r-0 (10)]          move    r5,ivl
+0538: c7 46 [0 w-b r-0 (58)]          xmit    46h,ivl
+0539: c7 01 [0 w-2 r-0 (10)]          xmit    1h,ivl
+053a: c7 b3 [0 w-b r-0 (58)]          xmit    0b3h,ivl
+053b: c7 00 [0 w-2 r-0 (10)]          xmit    0h,ivl
+053c: c7 00 [0 w-2 r-0 (10)]          xmit    0h,ivl
+053d: c7 a4 [0 w-b r-0 (58)]          xmit    0a4h,ivl
+053e: 17 05 [1 w-0 r-2 (82)]          move    sliv,r5
+053f: 17 04 [1 w-0 r-2 (82)]          move    sliv,r4
+0540: 17 03 [1 w-0 r-2 (82)]          move    sliv,r3
+0541: 17 02 [1 w-0 r-2 (82)]          move    sliv,r2
+0542: e4 b0 [0 w-0 r-0 (00)]          jmp     x04b0
+0543: c7 08 [0 w-c r-0 (60)]  x0543:  xmit    8h,ivl
+0544: c7 c8 [0 w-b r-0 (58)]          xmit    0c8h,ivl
+0545: c7 08 [0 w-2 r-0 (10)]          xmit    8h,ivl
+0546: e5 68 [0 w-0 r-0 (00)]          jmp     x0568
+0547: a6 49 [0 w-0 r-0 (00)]  x0547:  nzt     r6,x0549
+0548: e5 01 [0 w-0 r-0 (00)]          jmp     x0501
+0549: c7 08 [0 w-c r-0 (60)]  x0549:  xmit    8h,ivl
+054a: c7 38 [0 w-b r-0 (58)]          xmit    38h,ivl
+054b: 17 01 [1 w-0 r-2 (82)]          move    sliv,r1
+054c: c0 01 [0 w-0 r-0 (00)]          xmit    1h,aux
+054d: 21 01 [0 w-0 r-0 (00)]          add     r1,r1
+054e: c0 02 [0 w-0 r-0 (00)]          xmit    2h,aux
+054f: 61 02 [0 w-0 r-0 (00)]          xor     r1,r2
+0550: a2 52 [0 w-0 r-0 (00)]          nzt     r2,x0552
+0551: e5 55 [0 w-0 r-0 (00)]          jmp     x0555
+0552: c7 38 [0 w-b r-0 (58)]  x0552:  xmit    38h,ivl
+0553: 01 07 [0 w-2 r-0 (10)]          move    r1,ivl
+0554: e5 01 [0 w-0 r-0 (00)]          jmp     x0501
+0555: c6 2a [0 w-0 r-0 (00)]  x0555:  xmit    2ah,r6
+0556: e5 5d [0 w-0 r-0 (00)]          jmp     x055d
+0557: c7 08 [0 w-c r-0 (60)]  x0557:  xmit    8h,ivl
+0558: c7 a0 [0 w-b r-0 (58)]          xmit    0a0h,ivl
+0559: 05 07 [0 w-2 r-0 (10)]          move    r5,ivl
+055a: 04 07 [0 w-2 r-0 (10)]          move    r4,ivl
+055b: 03 07 [0 w-2 r-0 (10)]          move    r3,ivl
+055c: 02 07 [0 w-2 r-0 (10)]          move    r2,ivl
+055d: c7 08 [0 w-c r-0 (60)]  x055d:  xmit    8h,ivl
+055e: c7 c6 [0 w-b r-0 (58)]          xmit    0c6h,ivl
+055f: 17 09 [1 w-0 r-2 (82)]          move    sliv,r11
+0560: 06 07 [0 w-2 r-0 (10)]          move    r6,ivl
+0561: e0 1c [0 w-0 r-0 (00)]          jmp     x001c
+0562: c2 09 [0 w-0 r-0 (00)]  x0562:  xmit    9h,r2
+0563: c2 0a [0 w-0 r-0 (00)]          xmit    0ah,r2
+0564: c2 0b [0 w-0 r-0 (00)]          xmit    0bh,r2
+0565: c2 0c [0 w-0 r-0 (00)]          xmit    0ch,r2
+0566: 0f 0f [0 w-1 r-7 (0f)]          move    ivr,ivr
+0567: 40 40 [0 w-8 r-0 (40)]          and     aux>>>2,aux
+0568: e7 e3 [0 w-0 r-0 (00)]  x0568:  jmp     x07e3
+0569: e7 a3 [0 w-0 r-0 (00)]  x0569:  jmp     x07a3
+056a: c9 50 [0 w-0 r-0 (00)]  x056a:  xmit    50h,r11
+056b: c9 60 [0 w-0 r-0 (00)]          xmit    60h,r11
+056c: c9 70 [0 w-0 r-0 (00)]          xmit    70h,r11
+056d: c9 80 [0 w-0 r-0 (00)]          xmit    80h,r11
+056e: c7 08 [0 w-c r-0 (60)]  x056e:  xmit    8h,ivl
+056f: c7 03 [0 w-b r-0 (58)]          xmit    3h,ivl
+0570: 17 01 [1 w-0 r-2 (82)]          move    sliv,r1
+0571: c0 fc [0 w-0 r-0 (00)]          xmit    0fch,aux
+0572: 41 02 [0 w-0 r-0 (00)]          and     r1,r2
+0573: a2 75 [0 w-0 r-0 (00)]          nzt     r2,x0575
+0574: e5 77 [0 w-0 r-0 (00)]          jmp     x0577
+0575: c6 11 [0 w-0 r-0 (00)]  x0575:  xmit    11h,r6
+0576: e7 f9 [0 w-0 r-0 (00)]          jmp     x07f9
+0577: 81 6a [0 w-0 r-0 (00)]  x0577:  xec     x056a,r1
+0578: 09 07 [0 w-b r-0 (58)]          move    r11,ivl
+0579: 17 01 [1 w-0 r-2 (82)]          move    sliv,r1
+057a: 17 02 [1 w-0 r-2 (82)]          move    sliv,r2
+057b: a2 7e [0 w-0 r-0 (00)]          nzt     r2,x057e
+057c: 01 45 [0 w-0 r-0 (00)]          move    r1>>>2,r5
+057d: e5 7f [0 w-0 r-0 (00)]          jmp     x057f
+057e: 02 45 [0 w-0 r-0 (00)]  x057e:  move    r2>>>2,r5
+057f: c6 a8 [0 w-0 r-0 (00)]  x057f:  xmit    0a8h,r6
+0580: c0 01 [0 w-0 r-0 (00)]          xmit    1h,aux
+0581: 29 09 [0 w-0 r-0 (00)]          add     r11,r11
+0582: c4 0f [0 w-0 r-0 (00)]          xmit    0fh,r4
+0583: e5 86 [0 w-0 r-0 (00)]          jmp     x0586
+0584: 09 07 [0 w-b r-0 (58)]  x0584:  move    r11,ivl
+0585: 17 05 [1 w-0 r-2 (82)]          move    sliv,r5
+0586: 06 07 [0 w-b r-0 (58)]  x0586:  move    r6,ivl
+0587: 05 07 [0 w-2 r-0 (10)]          move    r5,ivl
+0588: c0 01 [0 w-0 r-0 (00)]          xmit    1h,aux
+0589: 29 09 [0 w-0 r-0 (00)]          add     r11,r11
+058a: 26 06 [0 w-0 r-0 (00)]          add     r6,r6
+058b: c0 04 [0 w-0 r-0 (00)]          xmit    4h,aux
+058c: 64 03 [0 w-0 r-0 (00)]          xor     r4,r3
+058d: c0 ff [0 w-0 r-0 (00)]          xmit    0ffh,aux
+058e: a3 90 [0 w-0 r-0 (00)]          nzt     r3,x0590
+058f: 26 06 [0 w-0 r-0 (00)]          add     r6,r6
+0590: 24 04 [0 w-0 r-0 (00)]  x0590:  add     r4,r4
+0591: a4 84 [0 w-0 r-0 (00)]          nzt     r4,x0584
+0592: c7 02 [0 w-b r-0 (58)]          xmit    2h,ivl
+0593: 17 01 [1 w-0 r-2 (82)]          move    sliv,r1
+0594: c0 fe [0 w-0 r-0 (00)]          xmit    0feh,aux
+0595: 21 02 [0 w-0 r-0 (00)]          add     r1,r2
+0596: a8 98 [0 w-0 r-0 (00)]          nzt     ovf,x0598
+0597: e5 e2 [0 w-0 r-0 (00)]          jmp     x05e2
+0598: c0 f5 [0 w-0 r-0 (00)]  x0598:  xmit    0f5h,aux
+0599: 21 02 [0 w-0 r-0 (00)]          add     r1,r2
+059a: a8 9c [0 w-0 r-0 (00)]          nzt     ovf,x059c
+059b: e5 a4 [0 w-0 r-0 (00)]          jmp     x05a4
+059c: c0 f0 [0 w-0 r-0 (00)]  x059c:  xmit    0f0h,aux
+059d: 21 02 [0 w-0 r-0 (00)]          add     r1,r2
+059e: a8 a0 [0 w-0 r-0 (00)]          nzt     ovf,x05a0
+059f: e5 e2 [0 w-0 r-0 (00)]          jmp     x05e2
+05a0: c0 11 [0 w-0 r-0 (00)]  x05a0:  xmit    11h,aux
+05a1: 61 02 [0 w-0 r-0 (00)]          xor     r1,r2
+05a2: a2 a4 [0 w-0 r-0 (00)]          nzt     r2,x05a4
+05a3: e6 1d [0 w-0 r-0 (00)]          jmp     x061d
+05a4: c0 10 [0 w-0 r-0 (00)]  x05a4:  xmit    10h,aux
+05a5: 61 02 [0 w-0 r-0 (00)]          xor     r1,r2
+05a6: a2 a8 [0 w-0 r-0 (00)]          nzt     r2,x05a8
+05a7: e5 b2 [0 w-0 r-0 (00)]          jmp     x05b2
+05a8: c7 08 [0 w-b r-0 (58)]  x05a8:  xmit    8h,ivl
+05a9: 17 02 [1 w-0 r-2 (82)]          move    sliv,r2
+05aa: a2 b2 [0 w-0 r-0 (00)]          nzt     r2,x05b2
+05ab: 17 02 [1 w-0 r-2 (82)]          move    sliv,r2
+05ac: a2 b2 [0 w-0 r-0 (00)]          nzt     r2,x05b2
+05ad: 17 02 [1 w-0 r-2 (82)]          move    sliv,r2
+05ae: a2 b2 [0 w-0 r-0 (00)]          nzt     r2,x05b2
+05af: 17 02 [1 w-0 r-2 (82)]          move    sliv,r2
+05b0: a2 b2 [0 w-0 r-0 (00)]          nzt     r2,x05b2
+05b1: e5 e2 [0 w-0 r-0 (00)]          jmp     x05e2
+05b2: c7 04 [0 w-b r-0 (58)]  x05b2:  xmit    4h,ivl
+05b3: 17 01 [1 w-0 r-2 (82)]          move    sliv,r1
+05b4: 17 02 [1 w-0 r-2 (82)]          move    sliv,r2
+05b5: 17 03 [1 w-0 r-2 (82)]          move    sliv,r3
+05b6: 17 04 [1 w-0 r-2 (82)]          move    sliv,r4
+05b7: c7 a0 [0 w-b r-0 (58)]          xmit    0a0h,ivl
+05b8: 01 07 [0 w-2 r-0 (10)]          move    r1,ivl
+05b9: 02 07 [0 w-2 r-0 (10)]          move    r2,ivl
+05ba: 03 07 [0 w-2 r-0 (10)]          move    r3,ivl
+05bb: 04 07 [0 w-2 r-0 (10)]          move    r4,ivl
+05bc: c7 a9 [0 w-b r-0 (58)]          xmit    0a9h,ivl
+05bd: 17 03 [1 w-0 r-2 (82)]          move    sliv,r3
+05be: 17 04 [1 w-0 r-2 (82)]          move    sliv,r4
+05bf: 17 05 [1 w-0 r-2 (82)]          move    sliv,r5
+05c0: 17 06 [1 w-0 r-2 (82)]          move    sliv,r6
+05c1: a3 c4 [0 w-0 r-0 (00)]          nzt     r3,x05c4
+05c2: c6 2e [0 w-0 r-0 (00)]          xmit    2eh,r6
+05c3: e7 f9 [0 w-0 r-0 (00)]          jmp     x07f9
+05c4: c7 04 [0 w-b r-0 (58)]  x05c4:  xmit    4h,ivl
+05c5: 17 00 [1 w-0 r-2 (82)]          move    sliv,aux
+05c6: c9 ff [0 w-0 r-0 (00)]          xmit    0ffh,r11
+05c7: 69 01 [0 w-0 r-0 (00)]          xor     r11,r1
+05c8: 03 00 [0 w-0 r-0 (00)]          move    r3,aux
+05c9: 21 01 [0 w-0 r-0 (00)]          add     r1,r1
+05ca: a8 cd [0 w-0 r-0 (00)]          nzt     ovf,x05cd
+05cb: c6 12 [0 w-0 r-0 (00)]          xmit    12h,r6
+05cc: e7 f9 [0 w-0 r-0 (00)]          jmp     x07f9
+05cd: 17 00 [1 w-0 r-2 (82)]  x05cd:  move    sliv,aux
+05ce: 69 01 [0 w-0 r-0 (00)]          xor     r11,r1
+05cf: 04 00 [0 w-0 r-0 (00)]          move    r4,aux
+05d0: 21 01 [0 w-0 r-0 (00)]          add     r1,r1
+05d1: a8 d4 [0 w-0 r-0 (00)]          nzt     ovf,x05d4
+05d2: c6 13 [0 w-0 r-0 (00)]          xmit    13h,r6
+05d3: e7 f9 [0 w-0 r-0 (00)]          jmp     x07f9
+05d4: 17 03 [1 w-0 r-2 (82)]  x05d4:  move    sliv,r3
+05d5: 17 04 [1 w-0 r-2 (82)]          move    sliv,r4
+05d6: c0 ff [0 w-0 r-0 (00)]          xmit    0ffh,aux
+05d7: 64 04 [0 w-0 r-0 (00)]          xor     r4,r4
+05d8: 63 03 [0 w-0 r-0 (00)]          xor     r3,r3
+05d9: 03 00 [0 w-0 r-0 (00)]          move    r3,aux
+05da: 25 05 [0 w-0 r-0 (00)]          add     r5,r5
+05db: 08 00 [0 w-0 r-0 (00)]          move    ovf,aux
+05dc: 26 06 [0 w-0 r-0 (00)]          add     r6,r6
+05dd: 04 00 [0 w-0 r-0 (00)]          move    r4,aux
+05de: 26 06 [0 w-0 r-0 (00)]          add     r6,r6
+05df: a8 e2 [0 w-0 r-0 (00)]          nzt     ovf,x05e2
+05e0: c6 14 [0 w-0 r-0 (00)]          xmit    14h,r6
+05e1: e7 f9 [0 w-0 r-0 (00)]          jmp     x07f9
+05e2: c7 02 [0 w-b r-0 (58)]  x05e2:  xmit    2h,ivl
+05e3: 17 02 [1 w-0 r-2 (82)]          move    sliv,r2
+05e4: c0 ea [0 w-0 r-0 (00)]          xmit    0eah,aux
+05e5: 22 01 [0 w-0 r-0 (00)]          add     r2,r1
+05e6: a8 e8 [0 w-0 r-0 (00)]          nzt     ovf,x05e8
+05e7: e6 02 [0 w-0 r-0 (00)]          jmp     x0602
+05e8: c6 15 [0 w-0 r-0 (00)]  x05e8:  xmit    15h,r6
+05e9: e6 be [0 w-0 r-0 (00)]          jmp     x06be
+05ea: c3 00 [0 w-0 r-0 (00)]  x05ea:  xmit    0h,r3
+05eb: e5 ed [0 w-0 r-0 (00)]          jmp     x05ed
+05ec: c3 01 [0 w-0 r-0 (00)]  x05ec:  xmit    1h,r3
+05ed: c1 00 [0 w-0 r-0 (00)]  x05ed:  xmit    0h,r1
+05ee: c2 01 [0 w-0 r-0 (00)]          xmit    1h,r2
+05ef: e6 41 [0 w-0 r-0 (00)]          jmp     x0641
+05f0: c3 00 [0 w-0 r-0 (00)]  x05f0:  xmit    0h,r3
+05f1: e5 f3 [0 w-0 r-0 (00)]          jmp     x05f3
+05f2: c3 01 [0 w-0 r-0 (00)]  x05f2:  xmit    1h,r3
+05f3: c1 00 [0 w-0 r-0 (00)]  x05f3:  xmit    0h,r1
+05f4: c2 00 [0 w-0 r-0 (00)]          xmit    0h,r2
+05f5: e6 41 [0 w-0 r-0 (00)]          jmp     x0641
+05f6: c3 00 [0 w-0 r-0 (00)]  x05f6:  xmit    0h,r3
+05f7: e5 f9 [0 w-0 r-0 (00)]          jmp     x05f9
+05f8: c3 01 [0 w-0 r-0 (00)]  x05f8:  xmit    1h,r3
+05f9: c1 01 [0 w-0 r-0 (00)]  x05f9:  xmit    1h,r1
+05fa: c2 01 [0 w-0 r-0 (00)]          xmit    1h,r2
+05fb: e6 41 [0 w-0 r-0 (00)]          jmp     x0641
+05fc: c3 00 [0 w-0 r-0 (00)]  x05fc:  xmit    0h,r3
+05fd: e5 ff [0 w-0 r-0 (00)]          jmp     x05ff
+05fe: c3 01 [0 w-0 r-0 (00)]  x05fe:  xmit    1h,r3
+05ff: c1 01 [0 w-0 r-0 (00)]  x05ff:  xmit    1h,r1
+0600: c2 00 [0 w-0 r-0 (00)]          xmit    0h,r2
+0601: e6 41 [0 w-0 r-0 (00)]          jmp     x0641
+0602: 82 03 [0 w-0 r-0 (00)]  x0602:  xec     x0603,r2
+0603: e6 3d [0 w-0 r-0 (00)]  x0603:  jmp     x063d
+0604: e6 40 [0 w-0 r-0 (00)]          jmp     x0640
+0605: e5 ea [0 w-0 r-0 (00)]          jmp     x05ea
+0606: e5 f0 [0 w-0 r-0 (00)]          jmp     x05f0
+0607: e5 f6 [0 w-0 r-0 (00)]          jmp     x05f6
+0608: e5 fc [0 w-0 r-0 (00)]          jmp     x05fc
+0609: e5 ec [0 w-0 r-0 (00)]          jmp     x05ec
+060a: e5 f2 [0 w-0 r-0 (00)]          jmp     x05f2
+060b: e5 f8 [0 w-0 r-0 (00)]          jmp     x05f8
+060c: e5 fe [0 w-0 r-0 (00)]          jmp     x05fe
+060d: e6 bf [0 w-0 r-0 (00)]          jmp     x06bf
+060e: e6 c7 [0 w-0 r-0 (00)]          jmp     x06c7
+060f: e6 cb [0 w-0 r-0 (00)]          jmp     x06cb
+0610: e6 eb [0 w-0 r-0 (00)]          jmp     x06eb
+0611: e6 cf [0 w-0 r-0 (00)]          jmp     x06cf
+0612: e6 f1 [0 w-0 r-0 (00)]          jmp     x06f1
+0613: e7 0e [0 w-0 r-0 (00)]          jmp     x070e
+0614: e6 1d [0 w-0 r-0 (00)]          jmp     x061d
+0615: e7 11 [0 w-0 r-0 (00)]          jmp     x0711
+0616: e7 14 [0 w-0 r-0 (00)]          jmp     x0714
+0617: e5 ea [0 w-0 r-0 (00)]          jmp     x05ea
+0618: e5 f0 [0 w-0 r-0 (00)]          jmp     x05f0
+0619: c4 50 [0 w-0 r-0 (00)]  x0619:  xmit    50h,r4
+061a: c4 60 [0 w-0 r-0 (00)]          xmit    60h,r4
+061b: c4 70 [0 w-0 r-0 (00)]          xmit    70h,r4
+061c: c4 80 [0 w-0 r-0 (00)]          xmit    80h,r4
+061d: c7 0c [0 w-b r-0 (58)]  x061d:  xmit    0ch,ivl
+061e: 17 03 [1 w-0 r-2 (82)]          move    sliv,r3
+061f: 17 01 [1 w-0 r-2 (82)]          move    sliv,r1
+0620: 17 01 [1 w-0 r-2 (82)]          move    sliv,r1
+0621: 17 02 [1 w-0 r-2 (82)]          move    sliv,r2
+0622: c7 03 [0 w-b r-0 (58)]          xmit    3h,ivl
+0623: 17 04 [1 w-0 r-2 (82)]          move    sliv,r4
+0624: 84 19 [0 w-0 r-0 (00)]          xec     x0619,r4
+0625: c7 20 [0 w-b r-0 (58)]          xmit    20h,ivl
+0626: c7 0c [0 w-2 r-0 (10)]          xmit    0ch,ivl
+0627: c7 00 [0 w-2 r-0 (10)]          xmit    0h,ivl
+0628: 04 07 [0 w-2 r-0 (10)]          move    r4,ivl
+0629: c7 00 [0 w-2 r-0 (10)]          xmit    0h,ivl
+062a: 01 07 [0 w-2 r-0 (10)]          move    r1,ivl
+062b: 02 07 [0 w-2 r-0 (10)]          move    r2,ivl
+062c: 03 07 [0 w-2 r-0 (10)]          move    r3,ivl
+062d: c7 68 [0 w-2 r-0 (10)]          xmit    68h,ivl
+062e: e1 f9 [0 w-0 r-0 (00)]          jmp     x01f9
+062f: a6 3c [0 w-0 r-0 (00)]  x062f:  nzt     r6,x063c
+0630: c7 03 [0 w-b r-0 (58)]          xmit    3h,ivl
+0631: 17 04 [1 w-0 r-2 (82)]          move    sliv,r4
+0632: 84 19 [0 w-0 r-0 (00)]          xec     x0619,r4
+0633: 04 07 [0 w-b r-0 (58)]          move    r4,ivl
+0634: c1 00 [0 w-0 r-0 (00)]          xmit    0h,r1
+0635: c2 0c [0 w-0 r-0 (00)]          xmit    0ch,r2
+0636: 17 00 [1 w-0 r-2 (82)]  x0636:  move    sliv,aux
+0637: 21 01 [0 w-0 r-0 (00)]          add     r1,r1
+0638: c0 ff [0 w-0 r-0 (00)]          xmit    0ffh,aux
+0639: 22 02 [0 w-0 r-0 (00)]          add     r2,r2
+063a: a2 36 [0 w-0 r-0 (00)]          nzt     r2,x0636
+063b: 01 07 [0 w-2 r-0 (10)]          move    r1,ivl
+063c: e7 f9 [0 w-0 r-0 (00)]  x063c:  jmp     x07f9
+063d: c7 c0 [0 w-b r-0 (58)]  x063d:  xmit    0c0h,ivl
+063e: c7 24 [0 w-2 r-0 (10)]          xmit    24h,ivl
+063f: e0 e8 [0 w-0 r-0 (00)]          jmp     x00e8
+0640: e0 40 [0 w-0 r-0 (00)]  x0640:  jmp     x0040
+0641: c7 43 [0 w-b r-0 (58)]  x0641:  xmit    43h,ivl
+0642: 01 07 [0 w-2 r-0 (10)]          move    r1,ivl
+0643: 02 07 [0 w-2 r-0 (10)]          move    r2,ivl
+0644: 03 07 [0 w-2 r-0 (10)]          move    r3,ivl
+0645: a2 4a [0 w-0 r-0 (00)]          nzt     r2,x064a
+0646: c7 c6 [0 w-b r-0 (58)]          xmit    0c6h,ivl
+0647: c7 28 [0 w-2 r-0 (10)]          xmit    28h,ivl
+0648: e4 a0 [0 w-0 r-0 (00)]          jmp     x04a0
+0649: a6 be [0 w-0 r-0 (00)]  x0649:  nzt     r6,x06be
+064a: c7 08 [0 w-b r-0 (58)]  x064a:  xmit    8h,ivl
+064b: 17 01 [1 w-0 r-2 (82)]          move    sliv,r1
+064c: a1 54 [0 w-0 r-0 (00)]          nzt     r1,x0654
+064d: c7 0a [0 w-b r-0 (58)]          xmit    0ah,ivl
+064e: 17 01 [1 w-0 r-2 (82)]          move    sliv,r1
+064f: a1 54 [0 w-0 r-0 (00)]          nzt     r1,x0654
+0650: 17 01 [1 w-0 r-2 (82)]          move    sliv,r1
+0651: a1 54 [0 w-0 r-0 (00)]          nzt     r1,x0654
+0652: c6 00 [0 w-0 r-0 (00)]          xmit    0h,r6
+0653: e7 f9 [0 w-0 r-0 (00)]          jmp     x07f9
+0654: c7 2b [0 w-b r-0 (58)]  x0654:  xmit    2bh,ivl
+0655: c7 00 [0 w-2 r-0 (10)]          xmit    0h,ivl
+0656: c7 c2 [0 w-b r-0 (58)]          xmit    0c2h,ivl
+0657: c7 60 [0 w-2 r-0 (10)]          xmit    60h,ivl
+0658: e1 04 [0 w-0 r-0 (00)]          jmp     x0104
+0659: c0 2f [0 w-0 r-0 (00)]  x0659:  xmit    2fh,aux
+065a: 66 09 [0 w-0 r-0 (00)]          xor     r6,r11
+065b: a9 63 [0 w-0 r-0 (00)]          nzt     r11,x0663
+065c: c7 46 [0 w-b r-0 (58)]          xmit    46h,ivl
+065d: 17 09 [1 w-0 r-2 (82)]          move    sliv,r11
+065e: a9 61 [0 w-0 r-0 (00)]          nzt     r11,x0661
+065f: c7 01 [0 w-2 r-0 (10)]          xmit    1h,ivl
+0660: e5 6e [0 w-0 r-0 (00)]          jmp     x056e
+0661: c6 2f [0 w-0 r-0 (00)]  x0661:  xmit    2fh,r6
+0662: e7 f9 [0 w-0 r-0 (00)]          jmp     x07f9
+0663: a6 be [0 w-0 r-0 (00)]  x0663:  nzt     r6,x06be
+0664: c7 45 [0 w-b r-0 (58)]          xmit    45h,ivl
+0665: 17 01 [1 w-0 r-2 (82)]          move    sliv,r1
+0666: a1 8a [0 w-0 r-0 (00)]          nzt     r1,x068a
+0667: e6 a1 [0 w-0 r-0 (00)]          jmp     x06a1
+0668: c7 a9 [0 w-b r-0 (58)]  x0668:  xmit    0a9h,ivl
+0669: 17 01 [1 w-0 r-2 (82)]          move    sliv,r1
+066a: 17 02 [1 w-0 r-2 (82)]          move    sliv,r2
+066b: c7 04 [0 w-b r-0 (58)]          xmit    4h,ivl
+066c: c0 01 [0 w-0 r-0 (00)]          xmit    1h,aux
+066d: 17 09 [1 w-0 r-2 (82)]          move    sliv,r11
+066e: 29 09 [0 w-0 r-0 (00)]          add     r11,r11
+066f: 09 00 [0 w-0 r-0 (00)]          move    r11,aux
+0670: 61 06 [0 w-0 r-0 (00)]          xor     r1,r6
+0671: a6 73 [0 w-0 r-0 (00)]          nzt     r6,x0673
+0672: c9 00 [0 w-0 r-0 (00)]          xmit    0h,r11
+0673: c7 04 [0 w-b r-0 (58)]  x0673:  xmit    4h,ivl
+0674: 09 07 [0 w-2 r-0 (10)]          move    r11,ivl
+0675: a9 89 [0 w-0 r-0 (00)]          nzt     r11,x0689
+0676: c0 01 [0 w-0 r-0 (00)]          xmit    1h,aux
+0677: 17 09 [1 w-0 r-2 (82)]          move    sliv,r11
+0678: 29 09 [0 w-0 r-0 (00)]          add     r11,r11
+0679: 09 00 [0 w-0 r-0 (00)]          move    r11,aux
+067a: 62 06 [0 w-0 r-0 (00)]          xor     r2,r6
+067b: a6 7d [0 w-0 r-0 (00)]          nzt     r6,x067d
+067c: c9 00 [0 w-0 r-0 (00)]          xmit    0h,r11
+067d: c7 05 [0 w-b r-0 (58)]  x067d:  xmit    5h,ivl
+067e: 09 07 [0 w-2 r-0 (10)]          move    r11,ivl
+067f: a9 89 [0 w-0 r-0 (00)]          nzt     r11,x0689
+0680: 17 06 [1 w-0 r-2 (82)]          move    sliv,r6
+0681: 17 09 [1 w-0 r-2 (82)]          move    sliv,r11
+0682: c0 01 [0 w-0 r-0 (00)]          xmit    1h,aux
+0683: 26 06 [0 w-0 r-0 (00)]          add     r6,r6
+0684: 08 00 [0 w-0 r-0 (00)]          move    ovf,aux
+0685: 29 09 [0 w-0 r-0 (00)]          add     r11,r11
+0686: c7 06 [0 w-b r-0 (58)]          xmit    6h,ivl
+0687: 06 07 [0 w-2 r-0 (10)]          move    r6,ivl
+0688: 09 07 [0 w-2 r-0 (10)]          move    r11,ivl
+0689: e5 6e [0 w-0 r-0 (00)]  x0689:  jmp     x056e
+068a: c7 ca [0 w-b r-0 (58)]  x068a:  xmit    0cah,ivl
+068b: c7 2c [0 w-2 r-0 (10)]          xmit    2ch,ivl
+068c: c1 00 [0 w-0 r-0 (00)]          xmit    0h,r1
+068d: e7 1a [0 w-0 r-0 (00)]          jmp     x071a
+068e: a6 be [0 w-0 r-0 (00)]  x068e:  nzt     r6,x06be
+068f: c7 ca [0 w-b r-0 (58)]          xmit    0cah,ivl
+0690: c7 30 [0 w-2 r-0 (10)]          xmit    30h,ivl
+0691: c1 04 [0 w-0 r-0 (00)]          xmit    4h,r1
+0692: e7 1a [0 w-0 r-0 (00)]          jmp     x071a
+0693: a6 be [0 w-0 r-0 (00)]  x0693:  nzt     r6,x06be
+0694: c7 ca [0 w-b r-0 (58)]  x0694:  xmit    0cah,ivl
+0695: c7 34 [0 w-2 r-0 (10)]          xmit    34h,ivl
+0696: e7 a3 [0 w-0 r-0 (00)]          jmp     x07a3
+0697: c7 c4 [0 w-b r-0 (58)]  x0697:  xmit    0c4h,ivl
+0698: c7 38 [0 w-2 r-0 (10)]          xmit    38h,ivl
+0699: e3 58 [0 w-0 r-0 (00)]          jmp     x0358
+069a: a6 9c [0 w-0 r-0 (00)]  x069a:  nzt     r6,x069c
+069b: e6 68 [0 w-0 r-0 (00)]          jmp     x0668
+069c: c7 c8 [0 w-b r-0 (58)]  x069c:  xmit    0c8h,ivl
+069d: c7 3c [0 w-2 r-0 (10)]          xmit    3ch,ivl
+069e: e7 e3 [0 w-0 r-0 (00)]          jmp     x07e3
+069f: a6 be [0 w-0 r-0 (00)]  x069f:  nzt     r6,x06be
+06a0: e6 94 [0 w-0 r-0 (00)]          jmp     x0694
+06a1: c7 ca [0 w-b r-0 (58)]  x06a1:  xmit    0cah,ivl
+06a2: c7 40 [0 w-2 r-0 (10)]          xmit    40h,ivl
+06a3: e7 a3 [0 w-0 r-0 (00)]          jmp     x07a3
+06a4: c7 d0 [0 w-b r-0 (58)]  x06a4:  xmit    0d0h,ivl
+06a5: c7 00 [0 w-2 r-0 (10)]          xmit    0h,ivl
+06a6: c7 c4 [0 w-b r-0 (58)]          xmit    0c4h,ivl
+06a7: c7 44 [0 w-2 r-0 (10)]          xmit    44h,ivl
+06a8: e3 58 [0 w-0 r-0 (00)]          jmp     x0358
+06a9: a6 ab [0 w-0 r-0 (00)]  x06a9:  nzt     r6,x06ab
+06aa: e6 a1 [0 w-0 r-0 (00)]          jmp     x06a1
+06ab: c0 21 [0 w-0 r-0 (00)]  x06ab:  xmit    21h,aux
+06ac: 66 09 [0 w-0 r-0 (00)]          xor     r6,r11
+06ad: a9 be [0 w-0 r-0 (00)]          nzt     r11,x06be
+06ae: c7 d0 [0 w-b r-0 (58)]          xmit    0d0h,ivl
+06af: 06 07 [0 w-2 r-0 (10)]          move    r6,ivl
+06b0: c7 ca [0 w-b r-0 (58)]  x06b0:  xmit    0cah,ivl
+06b1: c7 4c [0 w-2 r-0 (10)]          xmit    4ch,ivl
+06b2: c1 00 [0 w-0 r-0 (00)]          xmit    0h,r1
+06b3: e7 1a [0 w-0 r-0 (00)]          jmp     x071a
+06b4: a6 be [0 w-0 r-0 (00)]  x06b4:  nzt     r6,x06be
+06b5: c7 ca [0 w-b r-0 (58)]          xmit    0cah,ivl
+06b6: c7 50 [0 w-2 r-0 (10)]          xmit    50h,ivl
+06b7: c1 04 [0 w-0 r-0 (00)]          xmit    4h,r1
+06b8: e7 1a [0 w-0 r-0 (00)]          jmp     x071a
+06b9: a6 be [0 w-0 r-0 (00)]  x06b9:  nzt     r6,x06be
+06ba: c7 d0 [0 w-b r-0 (58)]          xmit    0d0h,ivl
+06bb: 17 06 [1 w-0 r-2 (82)]          move    sliv,r6
+06bc: a6 be [0 w-0 r-0 (00)]          nzt     r6,x06be
+06bd: e6 68 [0 w-0 r-0 (00)]          jmp     x0668
+06be: e7 f9 [0 w-0 r-0 (00)]  x06be:  jmp     x07f9
+06bf: c1 00 [0 w-0 r-0 (00)]  x06bf:  xmit    0h,r1
+06c0: c2 05 [0 w-0 r-0 (00)]          xmit    5h,r2
+06c1: c0 03 [0 w-0 r-0 (00)]          xmit    3h,aux
+06c2: e6 d2 [0 w-0 r-0 (00)]          jmp     x06d2
+06c3: a6 be [0 w-0 r-0 (00)]  x06c3:  nzt     r6,x06be
+06c4: c7 cc [0 w-b r-0 (58)]          xmit    0cch,ivl
+06c5: c7 6c [0 w-2 r-0 (10)]          xmit    6ch,ivl
+06c6: e2 ca [0 w-0 r-0 (00)]          jmp     x02ca
+06c7: c1 00 [0 w-0 r-0 (00)]  x06c7:  xmit    0h,r1
+06c8: c2 00 [0 w-0 r-0 (00)]          xmit    0h,r2
+06c9: c0 01 [0 w-0 r-0 (00)]          xmit    1h,aux
+06ca: e6 d2 [0 w-0 r-0 (00)]          jmp     x06d2
+06cb: c1 00 [0 w-0 r-0 (00)]  x06cb:  xmit    0h,r1
+06cc: c2 01 [0 w-0 r-0 (00)]          xmit    1h,r2
+06cd: c0 01 [0 w-0 r-0 (00)]          xmit    1h,aux
+06ce: e6 d2 [0 w-0 r-0 (00)]          jmp     x06d2
+06cf: c1 00 [0 w-0 r-0 (00)]  x06cf:  xmit    0h,r1
+06d0: c2 07 [0 w-0 r-0 (00)]          xmit    7h,r2
+06d1: c0 01 [0 w-0 r-0 (00)]          xmit    1h,aux
+06d2: c7 0a [0 w-b r-0 (58)]  x06d2:  xmit    0ah,ivl
+06d3: 17 03 [1 w-0 r-2 (82)]          move    sliv,r3
+06d4: 17 04 [1 w-0 r-2 (82)]          move    sliv,r4
+06d5: 17 09 [1 w-0 r-2 (82)]          move    sliv,r11
+06d6: 17 05 [1 w-0 r-2 (82)]          move    sliv,r5
+06d7: 17 05 [1 w-0 r-2 (82)]          move    sliv,r5
+06d8: 17 06 [1 w-0 r-2 (82)]          move    sliv,r6
+06d9: c7 20 [0 w-b r-0 (58)]          xmit    20h,ivl
+06da: 03 07 [0 w-2 r-0 (10)]          move    r3,ivl
+06db: 04 07 [0 w-2 r-0 (10)]          move    r4,ivl
+06dc: 01 07 [0 w-2 r-0 (10)]          move    r1,ivl
+06dd: 02 07 [0 w-2 r-0 (10)]          move    r2,ivl
+06de: 05 07 [0 w-2 r-0 (10)]          move    r5,ivl
+06df: 06 07 [0 w-2 r-0 (10)]          move    r6,ivl
+06e0: 09 07 [0 w-2 r-0 (10)]          move    r11,ivl
+06e1: 80 e3 [0 w-0 r-0 (00)]          xec     x06e3,aux
+06e2: 80 e7 [0 w-0 r-0 (00)]          xec     x06e7,aux
+06e3: c7 54 [0 w-2 r-0 (10)]  x06e3:  xmit    54h,ivl
+06e4: c7 24 [0 w-2 r-0 (10)]          xmit    24h,ivl
+06e5: c7 6c [0 w-2 r-0 (10)]          xmit    6ch,ivl
+06e6: c7 64 [0 w-2 r-0 (10)]          xmit    64h,ivl
+06e7: e1 f9 [0 w-0 r-0 (00)]  x06e7:  jmp     x01f9
+06e8: e1 f7 [0 w-0 r-0 (00)]          jmp     x01f7
+06e9: e1 f9 [0 w-0 r-0 (00)]          jmp     x01f9
+06ea: e1 f9 [0 w-0 r-0 (00)]          jmp     x01f9
+06eb: c1 00 [0 w-0 r-0 (00)]  x06eb:  xmit    0h,r1
+06ec: c2 01 [0 w-0 r-0 (00)]          xmit    1h,r2
+06ed: c0 02 [0 w-0 r-0 (00)]          xmit    2h,aux
+06ee: e6 d2 [0 w-0 r-0 (00)]          jmp     x06d2
+06ef: a6 be [0 w-0 r-0 (00)]  x06ef:  nzt     r6,x06be
+06f0: e7 14 [0 w-0 r-0 (00)]          jmp     x0714
+06f1: c1 00 [0 w-0 r-0 (00)]  x06f1:  xmit    0h,r1
+06f2: c2 07 [0 w-0 r-0 (00)]          xmit    7h,r2
+06f3: c0 00 [0 w-0 r-0 (00)]          xmit    0h,aux
+06f4: e6 d2 [0 w-0 r-0 (00)]          jmp     x06d2
+06f5: e7 0b [0 w-0 r-0 (00)]  x06f5:  jmp     x070b
+06f6: a6 f5 [0 w-0 r-0 (00)]  x06f6:  nzt     r6,x06f5
+06f7: c9 fe [0 w-0 r-0 (00)]          xmit    0feh,r11
+06f8: c1 00 [0 w-0 r-0 (00)]  x06f8:  xmit    0h,r1
+06f9: c0 01 [0 w-0 r-0 (00)]          xmit    1h,aux
+06fa: c7 08 [0 w-c r-0 (60)]  x06fa:  xmit    8h,ivl
+06fb: 01 07 [0 w-b r-0 (58)]          move    r1,ivl
+06fc: 17 03 [1 w-0 r-2 (82)]          move    sliv,r3
+06fd: c7 0f [0 w-c r-0 (60)]          xmit    0fh,ivl
+06fe: 01 07 [0 w-b r-0 (58)]          move    r1,ivl
+06ff: 17 04 [1 w-0 r-2 (82)]          move    sliv,r4
+0700: c7 08 [0 w-c r-0 (60)]          xmit    8h,ivl
+0701: 01 07 [0 w-b r-0 (58)]          move    r1,ivl
+0702: 04 07 [0 w-2 r-0 (10)]          move    r4,ivl
+0703: c7 0f [0 w-c r-0 (60)]          xmit    0fh,ivl
+0704: 01 07 [0 w-b r-0 (58)]          move    r1,ivl
+0705: 03 07 [0 w-2 r-0 (10)]          move    r3,ivl
+0706: 21 01 [0 w-0 r-0 (00)]          add     r1,r1
+0707: a1 0c [0 w-0 r-0 (00)]          nzt     r1,x070c
+0708: 29 09 [0 w-0 r-0 (00)]          add     r11,r11
+0709: a9 0d [0 w-0 r-0 (00)]          nzt     r11,x070d
+070a: c6 00 [0 w-0 r-0 (00)]  x070a:  xmit    0h,r6
+070b: e7 f9 [0 w-0 r-0 (00)]  x070b:  jmp     x07f9
+070c: e6 fa [0 w-0 r-0 (00)]  x070c:  jmp     x06fa
+070d: e6 f8 [0 w-0 r-0 (00)]  x070d:  jmp     x06f8
+070e: c7 c2 [0 w-b r-0 (58)]  x070e:  xmit    0c2h,ivl
+070f: c7 24 [0 w-2 r-0 (10)]          xmit    24h,ivl
+0710: e1 04 [0 w-0 r-0 (00)]          jmp     x0104
+0711: c7 c2 [0 w-b r-0 (58)]  x0711:  xmit    0c2h,ivl
+0712: c7 24 [0 w-2 r-0 (10)]          xmit    24h,ivl
+0713: e1 05 [0 w-0 r-0 (00)]          jmp     x0105
+0714: c7 34 [0 w-b r-0 (58)]  x0714:  xmit    34h,ivl
+0715: c7 00 [0 w-2 r-0 (10)]          xmit    0h,ivl
+0716: c7 00 [0 w-2 r-0 (10)]          xmit    0h,ivl
+0717: c7 00 [0 w-2 r-0 (10)]          xmit    0h,ivl
+0718: c7 00 [0 w-2 r-0 (10)]          xmit    0h,ivl
+0719: e7 0a [0 w-0 r-0 (00)]          jmp     x070a
+071a: c7 22 [0 w-b r-0 (58)]  x071a:  xmit    22h,ivl
+071b: c7 00 [0 w-2 r-0 (10)]          xmit    0h,ivl
+071c: c7 05 [0 w-2 r-0 (10)]          xmit    5h,ivl
+071d: c7 a8 [0 w-b r-0 (58)]          xmit    0a8h,ivl
+071e: 17 02 [1 w-0 r-2 (82)]          move    sliv,r2
+071f: 02 c2 [0 w-0 r-0 (00)]          move    r2>>>6,r2
+0720: c0 03 [0 w-0 r-0 (00)]          xmit    3h,aux
+0721: 42 03 [0 w-0 r-0 (00)]          and     r2,r3
+0722: c0 80 [0 w-0 r-0 (00)]          xmit    80h,aux
+0723: 42 02 [0 w-0 r-0 (00)]          and     r2,r2
+0724: c7 08 [0 w-b r-0 (58)]          xmit    8h,ivl
+0725: 17 06 [1 w-0 r-2 (82)]          move    sliv,r6
+0726: c7 0a [0 w-b r-0 (58)]          xmit    0ah,ivl
+0727: 17 04 [1 w-0 r-2 (82)]          move    sliv,r4
+0728: 17 05 [1 w-0 r-2 (82)]          move    sliv,r5
+0729: a1 2b [0 w-0 r-0 (00)]          nzt     r1,x072b
+072a: e7 35 [0 w-0 r-0 (00)]          jmp     x0735
+072b: c7 43 [0 w-b r-0 (58)]  x072b:  xmit    43h,ivl
+072c: 17 01 [1 w-0 r-2 (82)]          move    sliv,r1
+072d: a1 30 [0 w-0 r-0 (00)]          nzt     r1,x0730
+072e: c6 00 [0 w-0 r-0 (00)]          xmit    0h,r6
+072f: e7 a0 [0 w-0 r-0 (00)]          jmp     x07a0
+0730: c2 04 [0 w-0 r-0 (00)]  x0730:  xmit    4h,r2
+0731: c3 00 [0 w-0 r-0 (00)]          xmit    0h,r3
+0732: c7 22 [0 w-b r-0 (58)]          xmit    22h,ivl
+0733: c7 14 [0 w-2 r-0 (10)]          xmit    14h,ivl
+0734: c7 00 [0 w-2 r-0 (10)]          xmit    0h,ivl
+0735: a6 47 [0 w-0 r-0 (00)]  x0735:  nzt     r6,x0747
+0736: 03 00 [0 w-0 r-0 (00)]          move    r3,aux
+0737: 65 09 [0 w-0 r-0 (00)]          xor     r5,r11
+0738: a9 42 [0 w-0 r-0 (00)]          nzt     r11,x0742
+0739: 02 00 [0 w-0 r-0 (00)]          move    r2,aux
+073a: 64 09 [0 w-0 r-0 (00)]          xor     r4,r11
+073b: a9 3d [0 w-0 r-0 (00)]          nzt     r11,x073d
+073c: e7 47 [0 w-0 r-0 (00)]          jmp     x0747
+073d: c0 ff [0 w-0 r-0 (00)]  x073d:  xmit    0ffh,aux
+073e: 62 00 [0 w-0 r-0 (00)]          xor     r2,aux
+073f: 24 09 [0 w-0 r-0 (00)]          add     r4,r11
+0740: a8 47 [0 w-0 r-0 (00)]          nzt     ovf,x0747
+0741: e7 4b [0 w-0 r-0 (00)]          jmp     x074b
+0742: c0 ff [0 w-0 r-0 (00)]  x0742:  xmit    0ffh,aux
+0743: 63 00 [0 w-0 r-0 (00)]          xor     r3,aux
+0744: 25 09 [0 w-0 r-0 (00)]          add     r5,r11
+0745: a8 47 [0 w-0 r-0 (00)]          nzt     ovf,x0747
+0746: e7 4b [0 w-0 r-0 (00)]          jmp     x074b
+0747: c7 20 [0 w-b r-0 (58)]  x0747:  xmit    20h,ivl
+0748: 02 07 [0 w-2 r-0 (10)]          move    r2,ivl
+0749: 03 07 [0 w-2 r-0 (10)]          move    r3,ivl
+074a: e7 4e [0 w-0 r-0 (00)]          jmp     x074e
+074b: c7 20 [0 w-b r-0 (58)]  x074b:  xmit    20h,ivl
+074c: 04 07 [0 w-2 r-0 (10)]          move    r4,ivl
+074d: 05 07 [0 w-2 r-0 (10)]          move    r5,ivl
+074e: c7 0c [0 w-b r-0 (58)]  x074e:  xmit    0ch,ivl
+074f: 17 03 [1 w-0 r-2 (82)]          move    sliv,r3
+0750: 17 01 [1 w-0 r-2 (82)]          move    sliv,r1
+0751: 17 01 [1 w-0 r-2 (82)]          move    sliv,r1
+0752: 17 02 [1 w-0 r-2 (82)]          move    sliv,r2
+0753: c7 24 [0 w-b r-0 (58)]          xmit    24h,ivl
+0754: 01 07 [0 w-2 r-0 (10)]          move    r1,ivl
+0755: 02 07 [0 w-2 r-0 (10)]          move    r2,ivl
+0756: 03 07 [0 w-2 r-0 (10)]          move    r3,ivl
+0757: c7 20 [0 w-b r-0 (58)]          xmit    20h,ivl
+0758: 17 01 [1 w-0 r-2 (82)]          move    sliv,r1
+0759: 17 02 [1 w-0 r-2 (82)]          move    sliv,r2
+075a: a1 5e [0 w-0 r-0 (00)]          nzt     r1,x075e
+075b: a2 5e [0 w-0 r-0 (00)]          nzt     r2,x075e
+075c: c6 00 [0 w-0 r-0 (00)]          xmit    0h,r6
+075d: e7 a0 [0 w-0 r-0 (00)]          jmp     x07a0
+075e: c7 27 [0 w-b r-0 (58)]  x075e:  xmit    27h,ivl
+075f: c7 5c [0 w-2 r-0 (10)]          xmit    5ch,ivl
+0760: c7 45 [0 w-b r-0 (58)]          xmit    45h,ivl
+0761: 17 01 [1 w-0 r-2 (82)]          move    sliv,r1
+0762: a1 6a [0 w-0 r-0 (00)]          nzt     r1,x076a
+0763: c7 02 [0 w-b r-0 (58)]          xmit    2h,ivl
+0764: c0 ec [0 w-0 r-0 (00)]          xmit    0ech,aux
+0765: 17 01 [1 w-0 r-2 (82)]          move    sliv,r1
+0766: 21 01 [0 w-0 r-0 (00)]          add     r1,r1
+0767: c6 00 [0 w-0 r-0 (00)]          xmit    0h,r6
+0768: a8 6c [0 w-0 r-0 (00)]          nzt     ovf,x076c
+0769: e1 f7 [0 w-0 r-0 (00)]          jmp     x01f7
+076a: e1 f9 [0 w-0 r-0 (00)]  x076a:  jmp     x01f9
+076b: a6 a0 [0 w-0 r-0 (00)]  x076b:  nzt     r6,x07a0
+076c: c7 24 [0 w-b r-0 (58)]  x076c:  xmit    24h,ivl
+076d: 17 01 [1 w-0 r-2 (82)]          move    sliv,r1
+076e: 17 02 [1 w-0 r-2 (82)]          move    sliv,r2
+076f: 17 03 [1 w-0 r-2 (82)]          move    sliv,r3
+0770: c7 20 [0 w-b r-0 (58)]          xmit    20h,ivl
+0771: 17 00 [1 w-0 r-2 (82)]          move    sliv,aux
+0772: 21 01 [0 w-0 r-0 (00)]          add     r1,r1
+0773: 08 00 [0 w-0 r-0 (00)]          move    ovf,aux
+0774: 22 02 [0 w-0 r-0 (00)]          add     r2,r2
+0775: 08 00 [0 w-0 r-0 (00)]          move    ovf,aux
+0776: 23 03 [0 w-0 r-0 (00)]          add     r3,r3
+0777: 17 00 [1 w-0 r-2 (82)]          move    sliv,aux
+0778: 22 02 [0 w-0 r-0 (00)]          add     r2,r2
+0779: 08 00 [0 w-0 r-0 (00)]          move    ovf,aux
+077a: 23 03 [0 w-0 r-0 (00)]          add     r3,r3
+077b: c7 0c [0 w-b r-0 (58)]          xmit    0ch,ivl
+077c: 03 07 [0 w-2 r-0 (10)]          move    r3,ivl
+077d: c7 00 [0 w-2 r-0 (10)]          xmit    0h,ivl
+077e: 01 07 [0 w-2 r-0 (10)]          move    r1,ivl
+077f: 02 07 [0 w-2 r-0 (10)]          move    r2,ivl
+0780: c7 20 [0 w-b r-0 (58)]          xmit    20h,ivl
+0781: 17 01 [1 w-0 r-2 (82)]          move    sliv,r1
+0782: 17 02 [1 w-0 r-2 (82)]          move    sliv,r2
+0783: c0 ff [0 w-0 r-0 (00)]          xmit    0ffh,aux
+0784: 61 01 [0 w-0 r-0 (00)]          xor     r1,r1
+0785: 62 02 [0 w-0 r-0 (00)]          xor     r2,r2
+0786: c0 01 [0 w-0 r-0 (00)]          xmit    1h,aux
+0787: 21 01 [0 w-0 r-0 (00)]          add     r1,r1
+0788: 08 00 [0 w-0 r-0 (00)]          move    ovf,aux
+0789: 22 02 [0 w-0 r-0 (00)]          add     r2,r2
+078a: c7 08 [0 w-b r-0 (58)]          xmit    8h,ivl
+078b: 17 05 [1 w-0 r-2 (82)]          move    sliv,r5
+078c: c7 0a [0 w-b r-0 (58)]          xmit    0ah,ivl
+078d: 17 03 [1 w-0 r-2 (82)]          move    sliv,r3
+078e: 17 04 [1 w-0 r-2 (82)]          move    sliv,r4
+078f: 01 00 [0 w-0 r-0 (00)]          move    r1,aux
+0790: 23 03 [0 w-0 r-0 (00)]          add     r3,r3
+0791: 08 00 [0 w-0 r-0 (00)]          move    ovf,aux
+0792: 24 04 [0 w-0 r-0 (00)]          add     r4,r4
+0793: 08 00 [0 w-0 r-0 (00)]          move    ovf,aux
+0794: 25 05 [0 w-0 r-0 (00)]          add     r5,r5
+0795: 02 00 [0 w-0 r-0 (00)]          move    r2,aux
+0796: 24 04 [0 w-0 r-0 (00)]          add     r4,r4
+0797: 08 00 [0 w-0 r-0 (00)]          move    ovf,aux
+0798: 25 05 [0 w-0 r-0 (00)]          add     r5,r5
+0799: c0 ff [0 w-0 r-0 (00)]          xmit    0ffh,aux
+079a: 25 05 [0 w-0 r-0 (00)]          add     r5,r5
+079b: c7 08 [0 w-b r-0 (58)]          xmit    8h,ivl
+079c: 05 07 [0 w-2 r-0 (10)]          move    r5,ivl
+079d: c7 0a [0 w-b r-0 (58)]          xmit    0ah,ivl
+079e: 03 07 [0 w-2 r-0 (10)]          move    r3,ivl
+079f: 04 07 [0 w-2 r-0 (10)]          move    r4,ivl
+07a0: c7 ca [0 w-b r-0 (58)]  x07a0:  xmit    0cah,ivl
+07a1: 17 09 [1 w-0 r-2 (82)]          move    sliv,r11
+07a2: e0 1c [0 w-0 r-0 (00)]          jmp     x001c
+07a3: c7 a2 [0 w-b r-0 (58)]  x07a3:  xmit    0a2h,ivl
+07a4: 17 03 [1 w-0 r-2 (82)]          move    sliv,r3
+07a5: 17 04 [1 w-0 r-2 (82)]          move    sliv,r4
+07a6: c0 ff [0 w-0 r-0 (00)]          xmit    0ffh,aux
+07a7: 63 03 [0 w-0 r-0 (00)]          xor     r3,r3
+07a8: 64 04 [0 w-0 r-0 (00)]          xor     r4,r4
+07a9: c7 ad [0 w-b r-0 (58)]          xmit    0adh,ivl
+07aa: 17 05 [1 w-0 r-2 (82)]          move    sliv,r5
+07ab: 17 06 [1 w-0 r-2 (82)]          move    sliv,r6
+07ac: c9 00 [0 w-0 r-0 (00)]          xmit    0h,r11
+07ad: 03 00 [0 w-0 r-0 (00)]          move    r3,aux
+07ae: 25 05 [0 w-0 r-0 (00)]          add     r5,r5
+07af: 08 00 [0 w-0 r-0 (00)]          move    ovf,aux
+07b0: 26 06 [0 w-0 r-0 (00)]          add     r6,r6
+07b1: 04 00 [0 w-0 r-0 (00)]          move    r4,aux
+07b2: 26 06 [0 w-0 r-0 (00)]          add     r6,r6
+07b3: a8 b5 [0 w-0 r-0 (00)]          nzt     ovf,x07b5
+07b4: c9 04 [0 w-0 r-0 (00)]          xmit    4h,r11
+07b5: 17 05 [1 w-0 r-2 (82)]  x07b5:  move    sliv,r5
+07b6: 17 06 [1 w-0 r-2 (82)]          move    sliv,r6
+07b7: 03 00 [0 w-0 r-0 (00)]          move    r3,aux
+07b8: 25 05 [0 w-0 r-0 (00)]          add     r5,r5
+07b9: 08 00 [0 w-0 r-0 (00)]          move    ovf,aux
+07ba: 26 06 [0 w-0 r-0 (00)]          add     r6,r6
+07bb: 04 00 [0 w-0 r-0 (00)]          move    r4,aux
+07bc: 26 06 [0 w-0 r-0 (00)]          add     r6,r6
+07bd: a8 c0 [0 w-0 r-0 (00)]          nzt     ovf,x07c0
+07be: c0 02 [0 w-0 r-0 (00)]          xmit    2h,aux
+07bf: 29 09 [0 w-0 r-0 (00)]          add     r11,r11
+07c0: 09 26 [0 w-0 r-0 (00)]  x07c0:  move    r11>>>1,r6
+07c1: 86 df [0 w-0 r-0 (00)]          xec     x07df,r6
+07c2: c7 41 [0 w-b r-0 (58)]          xmit    41h,ivl
+07c3: 05 07 [0 w-2 r-0 (10)]          move    r5,ivl
+07c4: c7 45 [0 w-b r-0 (58)]          xmit    45h,ivl
+07c5: 17 04 [1 w-0 r-2 (82)]          move    sliv,r4
+07c6: c7 a8 [0 w-b r-0 (58)]          xmit    0a8h,ivl
+07c7: 17 06 [1 w-0 r-2 (82)]          move    sliv,r6
+07c8: c0 80 [0 w-0 r-0 (00)]          xmit    80h,aux
+07c9: 46 09 [0 w-0 r-0 (00)]          and     r6,r11
+07ca: a9 d2 [0 w-0 r-0 (00)]          nzt     r11,x07d2
+07cb: c0 40 [0 w-0 r-0 (00)]          xmit    40h,aux
+07cc: 46 09 [0 w-0 r-0 (00)]          and     r6,r11
+07cd: a9 d0 [0 w-0 r-0 (00)]          nzt     r11,x07d0
+07ce: c9 0f [0 w-0 r-0 (00)]          xmit    0fh,r11
+07cf: e7 d3 [0 w-0 r-0 (00)]          jmp     x07d3
+07d0: c9 0f [0 w-0 r-0 (00)]  x07d0:  xmit    0fh,r11
+07d1: e7 d3 [0 w-0 r-0 (00)]          jmp     x07d3
+07d2: c9 22 [0 w-0 r-0 (00)]  x07d2:  xmit    22h,r11
+07d3: c7 42 [0 w-b r-0 (58)]  x07d3:  xmit    42h,ivl
+07d4: 09 07 [0 w-2 r-0 (10)]          move    r11,ivl
+07d5: c7 a0 [0 w-b r-0 (58)]          xmit    0a0h,ivl
+07d6: 17 03 [1 w-0 r-2 (82)]          move    sliv,r3
+07d7: 17 00 [1 w-0 r-2 (82)]          move    sliv,aux
+07d8: 17 01 [1 w-0 r-2 (82)]          move    sliv,r1
+07d9: 17 09 [1 w-0 r-2 (82)]          move    sliv,r11
+07da: 09 82 [0 w-0 r-0 (00)]          move    r11>>>4,r2
+07db: 22 02 [0 w-0 r-0 (00)]          add     r2,r2
+07dc: c7 ca [0 w-b r-0 (58)]          xmit    0cah,ivl
+07dd: 17 09 [1 w-0 r-2 (82)]          move    sliv,r11
+07de: e0 1c [0 w-0 r-0 (00)]          jmp     x001c
+07df: c5 f8 [0 w-0 r-0 (00)]  x07df:  xmit    0f8h,r5
+07e0: c5 b8 [0 w-0 r-0 (00)]          xmit    0b8h,r5
+07e1: c5 fc [0 w-0 r-0 (00)]          xmit    0fch,r5
+07e2: c5 bc [0 w-0 r-0 (00)]          xmit    0bch,r5
+07e3: c7 2b [0 w-b r-0 (58)]  x07e3:  xmit    2bh,ivl
+07e4: 17 01 [1 w-0 r-2 (82)]          move    sliv,r1
+07e5: c0 01 [0 w-0 r-0 (00)]          xmit    1h,aux
+07e6: 21 01 [0 w-0 r-0 (00)]          add     r1,r1
+07e7: c7 2b [0 w-b r-0 (58)]          xmit    2bh,ivl
+07e8: 01 07 [0 w-2 r-0 (10)]          move    r1,ivl
+07e9: c0 14 [0 w-0 r-0 (00)]          xmit    14h,aux
+07ea: 61 09 [0 w-0 r-0 (00)]          xor     r1,r11
+07eb: a9 ed [0 w-0 r-0 (00)]          nzt     r11,x07ed
+07ec: e7 f6 [0 w-0 r-0 (00)]          jmp     x07f6
+07ed: c0 0a [0 w-0 r-0 (00)]  x07ed:  xmit    0ah,aux
+07ee: 61 09 [0 w-0 r-0 (00)]          xor     r1,r11
+07ef: c6 00 [0 w-0 r-0 (00)]          xmit    0h,r6
+07f0: a9 f6 [0 w-0 r-0 (00)]  x07f0:  nzt     r11,x07f6
+07f1: c7 b5 [0 w-b r-0 (58)]          xmit    0b5h,ivl
+07f2: c7 00 [0 w-2 r-0 (10)]          xmit    0h,ivl
+07f3: c7 c2 [0 w-b r-0 (58)]          xmit    0c2h,ivl
+07f4: c7 58 [0 w-2 r-0 (10)]          xmit    58h,ivl
+07f5: e1 04 [0 w-0 r-0 (00)]          jmp     x0104
+07f6: c7 c8 [0 w-b r-0 (58)]  x07f6:  xmit    0c8h,ivl
+07f7: 17 09 [1 w-0 r-2 (82)]          move    sliv,r11
+07f8: e0 1c [0 w-0 r-0 (00)]          jmp     x001c
+07f9: e0 52 [0 w-0 r-0 (00)]  x07f9:  jmp     x0052
+
+; probably fill after this
+07fa: ce ce [1 w-9 r-6 (ce)]          xmit    0ceh,r16
+07fb: b0 b0 [1 w-6 r-0 (b0)]          nzt     sliv[11:7],x07f0
+07fc: 1f 1f [0 w-3 r-7 (1f)]          move    sriv,driv
+07fd: a0 a0 [1 w-4 r-0 (a0)]          nzt     aux,x07a0
+07fe: cf cf [1 w-9 r-7 (cf)]          xmit    0cfh,ivr
+07ff: d1 d1 [1 w-a r-1 (d1)]          xmit    11h,dliv[11:6]
+
+; the end
