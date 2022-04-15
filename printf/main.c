@@ -36,10 +36,18 @@ bss_clear ( unsigned int *b1, unsigned int *b2 )
 }
 
 /* Test multibus RAM.
- * We have 512K at 0x110000 to 0x18ffff
- */
-
-/* Every segment shows this:
+ *
+ * Card 1 has 64K at 0x100000 to 0x10ffff
+ * It has no errors.
+ *
+ * Card 2 has 512K at 0x110000 to 0x18ffff
+ * It has many errors, as follows ---
+ *
+ * Note - the 0x0018xxxx address is correct,
+ * this card is "bumped up" by 64k to leave room
+ * for card 1 ahead of it.
+ *
+ * Every segment shows this:
 
 Fail at 0018FC00 -- DEADBEEF --> 00010001
 Fail at 0018FC00 -- 21524110 --> 00010001
@@ -58,9 +66,6 @@ Fail at 0018FC18 -- 21524110 --> 00010001
 Fail at 0018FC1C -- DEADBEEF --> 00010001
 Fail at 0018FC1C -- 21524110 --> 00010001
  */
-
-#define MB_BASE		0x110000
-#define MB_SIZE 	512*1024
 
 /* Avoid last 4K */
 #define SEG_SIZE 	15*4096
@@ -121,6 +126,20 @@ ram_seg2 ( int base )
 	    printf ( "Seg %h OK\n", base );
 }
 
+#ifdef notdef
+/* This is correct for "Card 2" which has the MB8264 chips
+ * and various problems
+ */
+#define MB_BASE		0x110000
+#define MB_SIZE 	512*1024
+#endif
+
+/* This is correct for "Card 1" which has 4116 chips
+ */
+#define MB_BASE		0x100000
+#define MB_SIZE 	64*1024
+
+
 void
 ram_test ( void )
 {
@@ -130,6 +149,9 @@ ram_test ( void )
 	base = MB_BASE;
 	end = base + MB_SIZE;
 
+	/* We loop over 64K sections.
+	 * Card 1 has only one such section.
+	 */
 	while ( base < end ) {
 	    printf ( "Testing: %h\n", base );
 	    ram_seg ( base );
