@@ -161,17 +161,15 @@ hd_wait ( void )
 {
 	struct hd_regs *hp = HD_BASE;
 	int w;
-
-#ifdef notdef
-/* Case 1 - this causes weird crashes */
-
-/* We see 0x80 when polling, i.e. BUSY */
 	int s;
 
+	/* We see 0x80 when polling, i.e. BUSY */
+
+	/* This now works as it should */
 	w = 0;
 	while ( w < LIMIT ) {
 	    s = hp->status;
-	    printf ( " status: %h\n", s );
+	    // printf ( " status: %h\n", s );
 	    if ( s & ST_BUSY ) {
 		w++;
 		continue;
@@ -179,41 +177,10 @@ hd_wait ( void )
 	    break;
 	}
 
-	/* I see: 0x1934F = 103247 */
+	/* I once saw: 0x1934F = 103247
+	 * when using the defective RAM board.
+	 */
 	printf ( "hd_wait finished after: %h\n", w );
-#endif
-
-#ifdef notdef
-/* Case 2 - this works */
-	uart_putc ( 'X' );
-	uart_putc ( 'X' );
-	delay_one ();
-
-	w = 0;
-	while ( w < LIMIT ) {
-	    delay_one ();
-	    if ( hp->status & ST_BUSY ) {
-		w++;
-		uart_putc ( '.' );
-	    } else
-		break;
-	}
-#endif
-
-/* Case 3 - this works */
-/* this is finished after 1 check */
-
-	w = 0;
-	while ( w < LIMIT ) {
-	    if ( hp->status & ST_BUSY ) {
-		w++;
-		// uart_putc ( '.' );
-		delay_ms ( 1 );
-	    } else
-		break;
-	}
-
-	printf ( "hd_wait finished after: %d\n", w );
 }
 
 void
