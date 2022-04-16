@@ -1,0 +1,29 @@
+4-15-2022
+
+
+This description will be attached to my bad
+Micro Memory MM-8086D card.
+It has the following issues:
+
+1) It cost me at least a month of frustration and confusion.
+
+And in chronological order of discovery
+
+2) When jumpered to start at address 0, it does not work !?
+  I forget the details of the failure.
+
+3) I wrote a RAM diagnostic and it finds many bad patches in
+  a fairly regular pattern.  I had hoped to just use good
+  areas, but that leads to 4 and 5
+
+4) A bypass capacitor on the unused 12 volt rail was shorted
+  which gives the power supply grief and I misdiagnosed as
+  a power supply problem.  This capacitor was found and removed.
+
+5) discovered 4-15-2022, When the HD controller tries to do DMA
+  writes, the card locks up the multibus causing total chaos.
+  DMA reads seem to work fine (and the CPU can do writes).
+
+After discovering (5) I swapped my other 64K card into the Callan,
+and it seems to work perfectly.  This card is almost certainly
+not worth the trouble to troubleshoot and repair

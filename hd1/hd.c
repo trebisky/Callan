@@ -4,6 +4,7 @@
  * the Callan CWC
  *
  *  2-27-2022  Tom Trebisky
+ *  4-15-2022  Tom Trebisky
  *
  */
 
@@ -35,6 +36,7 @@ struct hd_regs {
 
 #define addr_lo		status
 
+/* This is 18 bytes (9 words) */
 struct hd_cmd {
 	vu_char		unit;
 	vu_char		cmd;
@@ -46,6 +48,7 @@ struct hd_cmd {
 	vu_long		status;
 };
 
+/* This is 24 bytes (12 words) */
 struct hd_status {
 	vu_char		code;
 	vu_char		stat;
@@ -90,7 +93,10 @@ struct hd_status {
  * For this project this is no big deal
  */
 #define MB_BASE			0x100000
-#define MB_OFFSET		0x10000
+// The following for the faulty Card 2
+// #define MB_OFFSET		0x10000
+// The following for Card 1
+#define MB_OFFSET		0x00000
 #define LOCAL_MB_BASE		(MB_BASE + MB_OFFSET)
 
 /* What I call "DMA" addresses are addresses as seen by the CWC */
@@ -211,6 +217,13 @@ hd_wait ( void )
 }
 
 void
+hd_show_data ( char *buf, int count )
+{
+	printf ( "Data block --\n" );
+	dump_buf ( buf, count );
+}
+
+void
 hd_show_status ( struct hd_status *hs )
 {
 	printf ( "Status block --\n" );
@@ -231,7 +244,7 @@ hd_show_status ( struct hd_status *hs )
  */
 
 void
-hd_test_cmd ( int cmd )
+hd_test_cmd ( int cmd, int count )
 {
 	struct hd_cmd *hd_cmd;
 	struct hd_status *hd_status;
@@ -252,7 +265,7 @@ hd_test_cmd ( int cmd )
 	hd_cmd->cmd = cmd;
 	hd_cmd->unit = 0;
 	hd_cmd->status = (vu_long) DMA_STATUS;
-	hd_cmd->count = sizeof ( struct hd_status );
+	hd_cmd->count = count;
 	hd_cmd->addr = (vu_long) DMA_DATA;
 
 	printf ( "Starting cmd\n" );
@@ -267,27 +280,27 @@ hd_test_cmd ( int cmd )
 	printf ( "Waiting done\n" );
 
 	hd_show_status ( (struct hd_status *) LOCAL_STATUS );
-	hd_show_status ( (struct hd_status *) LOCAL_DATA );
+	hd_show_data ( (char *) LOCAL_DATA, count );
 }
 
 void
 hd_reset_controller ( void )
 {
 	/* Reset controller */
-	hd_test_cmd ( CMD_RESET );
+	hd_test_cmd ( CMD_RESET, 16 );
 }
 
 void
 hd_check_status ( void )
 {
 	/* Get status of selected drive */
-	hd_test_cmd ( CMD_STATUS );
+	hd_test_cmd ( CMD_STATUS, 16 );
 }
 
 void
 hd_read_ram ( void )
 {
-	hd_test_cmd ( CMD_RRAM );
+	hd_test_cmd ( CMD_RRAM, 2048 );
 }
 
 void
@@ -533,7 +546,7 @@ scope_test_cmd ( int cmd )
 	hd_cmd->cmd = cmd;
 	hd_cmd->unit = 0;
 	hd_cmd->status = (vu_long) DMA_STATUS;
-	hd_cmd->count = sizeof ( struct hd_status );
+	hd_cmd->count = sizeof ( struct hd_status );	/* XXX */
 	hd_cmd->addr = (vu_long) DMA_DATA;
 
 	/* loop here starting the command over and over */
@@ -553,12 +566,11 @@ scope_test_cmd ( int cmd )
 	    scope_wait ();
 	    // printf ( "Waiting done\n" );
 	}
-
-	// hd_show_status ( (struct hd_status *) LOCAL_STATUS );
-	// hd_show_status ( (struct hd_status *) LOCAL_DATA );
 }
 
-/* On a 20 pin chip like an LS245, pin 10 is ground,
+/* 4-15-2022, get serious with a logic analyzer.
+ *
+ * On a 20 pin chip like an LS245, pin 10 is ground,
  *  and pin 20 is Vcc.
  * I connect probe 0 to Multibus BCLK
  * I connect probe 1 to BREQ
@@ -602,6 +614,14 @@ scope_test_cmd ( int cmd )
  * sort.  So why is the CWC "hung" and not releasing the bus?
  * Maybe it is time to try a different memory card.
  *
+ * I try my other memory card and indeed, the problem is solved.
+ * The other (good) card has only 64K of ram via 4116 chips,
+ * but a little memory that works is better than a lot that doesn't.
+ * Now I see the 9 pulses with Mrdc going low (hence reading).
+ * Then 120 us later I see 12 pulses with Mwtc going low (hence writing).
+ * Then 190 us later I see 12 pulses again, also writing.
+ *
+ * 12 pulses would account for the status block being written, but why twice?
  */
 void
 scope2 ( void )
@@ -625,10 +645,10 @@ hd_test ( void )
 	// hd_test4 ();
 	// hd_test5 ();
 
-	// hd_test1 ();
+	hd_test1 ();
 
 	// scope1 ();
-	scope2 ();
+	// scope2 ();
 }
 
 void

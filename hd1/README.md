@@ -1,9 +1,11 @@
-My first code for the Callan
+My first code for the Callan Hard Drive controller.
 
-This began as Heurikon/blink1, which was some code to run
-on the Heurikon HK68/ME board that I developed back in 2013.
+This has mostly been a month long miserable troubleshooting
+experience involving bad power supplies and above all a
+faulty multibus memory board.
 
-This code was loaded into the Callan using a serial cable talking
-to the boot rom.  I didn't have S-record code running yet,
-so I just poked it in 16 bytes at a time using the bootrom "E"
-command, which was fine for an initial test.
+The problem was solved in a day using my Openbench Logic Sniffer.
+There are detailed notes in the comments, especially in hd.c
+
+I am going to leave this project "as is" and copy it to hd2
+for further work, now that I have hardware issues sorted out.
