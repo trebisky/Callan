@@ -13,5 +13,7 @@ remote "stub" protocol.
 -- First - a first tiny test to download and run
 -- libgcc - vital routines from libgcc in assembler
 -- printf - set up a C development framework
--- hd1 - experimental driver for the hard drive controller
+-- hd1 - first attempts at driver for the hard drive controller
 -- cwc-firmware - analysis of firmware in the hard drive controller
+-- hd2 - driver for the hard drive controller after I get good RAM card
+-- uart - improved serial IO for interaction with python script

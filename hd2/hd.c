@@ -63,6 +63,18 @@ struct hd_status {
 	vu_long		ecc;
 };
 
+/* This is 12 bytes */
+struct hd_params {
+	vu_short	sector_size;
+	vu_char		heads;
+	vu_char		spt;
+	vu_short	ncyl;
+	vu_short	rwc;
+	vu_short	pre;
+	vu_char		step_norm;
+	vu_char		step_restore;
+};
+
 #define CMD_STATUS	0
 #define CMD_RESET	1
 #define CMD_READ	3
@@ -112,6 +124,16 @@ struct hd_status {
 /* for command timeouts */
 #define LIMIT	500000
 
+/* Nothing here for now, but this always gets called to start the driver.
+ */
+void
+hd_init ( void )
+{
+}
+
+/* So far, I have always seen this immediately go busy with no
+ * need to loop and check.  But it does not hurt.
+ */
 int
 hd_start ( int verbose )
 {
@@ -125,8 +147,8 @@ hd_start ( int verbose )
 	}
 
 	addr = DMA_CMD;
-	if ( verbose )
-	    printf ( "Give controller addr = %h\n", addr );
+	// if ( verbose )
+	//     printf ( "Give controller addr = %h\n", addr );
 
 	hp->addr_lo = addr & 0xff;
 	hp->addr_mid = (addr>>8) & 0xff;
@@ -180,7 +202,7 @@ hd_wait ( void )
 	/* I once saw: 0x1934F = 103247
 	 * when using the defective RAM board.
 	 */
-	printf ( "hd_wait finished after: %h\n", w );
+	printf ( "hd_wait finished after: %d\n", w );
 }
 
 void
@@ -270,15 +292,111 @@ hd_read_ram ( void )
 	hd_test_cmd ( CMD_RRAM, 2048 );
 }
 
+#define SECTOR_SIZE	512
+
+/* This is hd_test_cmd() copied and modified.
+ * The first time I tried it, it complained that a disk paramter block
+ * had not been loaded!
+ */
+void
+hd_read_sector ( int c, int h, int s )
+{
+	struct hd_cmd *hd_cmd;
+	struct hd_status *hd_status;
+	struct hd_data *hd_data;
+	int stat;
+
+	hd_cmd = (struct hd_cmd *) LOCAL_CMD;
+	hd_status = (struct hd_status *) LOCAL_STATUS;
+	hd_data = (struct hd_data *) LOCAL_DATA;
+
+	memset ( (char *) hd_cmd, sizeof(*hd_cmd), 0 );
+	memset ( (char *) hd_status, sizeof(*hd_status), 0xab );
+	memset ( (char *) hd_data, SECTOR_SIZE, 0xab );
+
+	// printf ( "Blocks clear\n" );
+	// hd_show_status ( LOCAL_STATUS );
+
+	hd_cmd->cmd = CMD_READ;
+	hd_cmd->unit = 0;
+	hd_cmd->head = h;
+	hd_cmd->sector = s;
+	hd_cmd->cyl = c;
+	hd_cmd->status = (vu_long) DMA_STATUS;
+	hd_cmd->count = SECTOR_SIZE;
+	hd_cmd->addr = (vu_long) DMA_DATA;
+
+	// printf ( "Starting cmd\n" );
+	stat = hd_start ( 1 );
+	if ( ! stat ) {
+	    printf ( "Command aborted\n" );
+	    return;
+	}
+
+	// printf ( "Waiting for cmd\n" );
+	hd_wait ();
+	// printf ( "Waiting done\n" );
+
+	hd_show_status ( (struct hd_status *) LOCAL_STATUS );
+	hd_show_data ( (char *) LOCAL_DATA, SECTOR_SIZE );
+}
+
+/* I have a Rodime 204 drive
+ * This has 320 cylinders and 8 heads (4 platters)
+ * It can be formatted to have 17 sectors of 512 bytes
+ * Values below are pulled from the Aux ROM disassembly.
+ * Note in particular the big value for "ncyl"
+ */
+
+/* And this is hd_read_sector() copied and modified.
+ */
 void
 hd_params ( void )
 {
+	struct hd_cmd *hd_cmd;
+	struct hd_status *hd_status;
+	struct hd_params *hd_params;
+	int stat;
+
+	hd_cmd = (struct hd_cmd *) LOCAL_CMD;
+	hd_status = (struct hd_status *) LOCAL_STATUS;
+	hd_params = (struct hd_params *) LOCAL_DATA;
+
+	memset ( (char *) hd_cmd, sizeof(*hd_cmd), 0 );
+	memset ( (char *) hd_status, sizeof(*hd_status), 0xab );
+	memset ( (char *) hd_params, sizeof(struct hd_params), 0 );
+
+	/* Now load stuff for our Rodime RO 204 */
+	/* We never intend to write, so ignore rwc and pre */
+	hd_params->sector_size = 512;
+	hd_params->heads = 8;
+	hd_params->spt = 17;
+	hd_params->ncyl = 0x3ff;
+	// hd_params->rwc = 0xf0;
+	// hd_params->pre = 0xf0;
+	hd_params->step_norm = 0x9e;
+	hd_params->step_restore = 0xc;
+
+	hd_cmd->cmd = CMD_PARAMS;
+	hd_cmd->unit = 0;
+	hd_cmd->status = (vu_long) DMA_STATUS;
+	hd_cmd->count = sizeof(struct hd_params);
+	hd_cmd->addr = (vu_long) DMA_DATA;
+
+	stat = hd_start ( 1 );
+	if ( ! stat ) {
+	    printf ( "Command aborted\n" );
+	    return;
+	}
+
+	hd_wait ();
+
+	hd_show_status ( (struct hd_status *) LOCAL_STATUS );
 }
 
-void
-hd_init ( void )
-{
-}
+/* =========================================================================== */
+/* =========================================================================== */
+/* =========================================================================== */
 
 /* mid always reads as zero.
  */
@@ -379,12 +497,10 @@ hd_test1 ( void )
 	printf ( " --- --- Reset controller\n" );
 	hd_reset_controller ();
 #endif
-
-#ifdef notyet
-	printf ( " --- --- Drive params\n" );
-	hd_params ();
-#endif
 }
+
+/* =========================================================================== */
+/* =========================================================================== */
 
 void
 hd_test_rram ( void )
@@ -399,6 +515,7 @@ hd_test_status ( void )
 	printf ( " --- --- Check drive 0 status\n" );
 	hd_check_status ();
 }
+
 
 /* status gives the following:
 Starting HD test
@@ -425,6 +542,25 @@ Data block --
  */
 
 void
+hd_test_read ( void )
+{
+	int cyl, head, sector;
+
+	printf ( " --- --- Read sector\n" );
+	hd_read_sector ( 0, 0, 0 );
+}
+
+void
+hd_test_params ( void )
+{
+	int cyl, head, sector;
+
+	printf ( " --- --- Load params\n" );
+	hd_params ();
+}
+
+
+void
 hd_test ( void )
 {
 	// hd_test2 ();
@@ -433,7 +569,10 @@ hd_test ( void )
 	// hd_test5 ();
 
 	// hd_test_rram ();
-	hd_test_status ();
+	// hd_test_status ();
+
+	hd_test_params ();
+	hd_test_read ();
 }
 
 void
