@@ -53,9 +53,21 @@ getlib:
 	cp ../libgcc/libm68k.a .
 
 # Address should match what is in callan.lds
+#
+# My terminal emulator built into sloader is broken for handling
+# keyboard input (it does fine to log output).
+# But this works just fine to let calcon run picocom
 test: callan.img
 	sloader callan.img -t 0x10000
 	calcon
+	#picocom -b 9600 /dev/ttyUSB0
+
+lrun: callan.img
+	sloader callan.img -t 0x10000
+	./callan.py
+
+run:
+	./callan.py
 
 # As of 3-1-2022, I am using gcc 11.2.1
 version:

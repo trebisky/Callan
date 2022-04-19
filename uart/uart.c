@@ -42,13 +42,32 @@ int
 uart_getc ( void )
 {
 	struct uart *up = UART0_BASE;
+	int rv;
 
 	while ( ! (up->csr & CSR_RCA) )
 	    ;
 
-	return ( up->data & 0x7f );
+	rv = up->data & 0x7f;
+	if ( rv == '\r' )
+	    rv = '\n';
+	return rv;
 }
 
+void
+uart_gets ( char *buf )
+{
+	char *p = buf;
+	int c;
+
+	for ( ;; ) {
+	    c = uart_getc ();
+	    if ( c == '\n' ) {
+		*p = '\0';
+		return;
+	    }
+	    *p++ = c;
+	}
+}
 
 void
 uart_putc ( int c )

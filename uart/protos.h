@@ -3,6 +3,7 @@
 
 void uart_init ( void );
 int uart_getc ( void );
+void uart_gets ( char * );
 void uart_putc ( int );
 void uart_puts ( char * );
 void uart_stat ( void );
