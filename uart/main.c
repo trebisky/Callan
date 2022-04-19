@@ -61,6 +61,20 @@ bss_clear ( unsigned int *b1, unsigned int *b2 )
 void
 user_test ( void )
 {
+	int c;
+
+#ifdef notdef
+	for ( ;; ) {
+	    c = uart_getc ();
+	    if ( c == 'q' )
+		break;
+	    uart_putc ( c );
+	}
+#endif
+	for ( ;; ) {
+	    uart_stat ();
+	    delay_one ();
+	}
 }
 
 void

@@ -1105,6 +1105,7 @@
 
 ; XXX - an important note on the above.
 ; I believe s/t and h/c are reversed.
+; This is all about multibus byte order.
 ; i.e. the manual has it wrong.
 ; I believe the software in this ROM and
 ;  17 seems like a proper number for sectors/track

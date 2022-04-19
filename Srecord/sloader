@@ -35,7 +35,8 @@ import queue
 import time
 from subprocess import Popen, PIPE
 
-device = "/dev/ttyUSB1"
+device = "/dev/ttyUSB0"
+#device = "/dev/ttyUSB1"
 baud = 9600
 
 # ========================================================
@@ -499,22 +500,36 @@ def im_load ( path, base ) :
     print ( "Done" )
 
 
-def run_image ( path, base ) :
+def run_image ( path, base, start ) :
     sync ()
 
     im_load ( path, base )
-    go ( base )
+    if start :
+        go ( base )
 
 # ------------------------------------------------------
 
 if len(sys.argv) < 2 :
-    print ( "Usage: sloader im_path [addr]" )
+    print ( "Usage: sloader im_path [-s] [-t] [addr]" )
     exit ()
 
-im_path = sys.argv[1]
+start_opt = True
+term_opt = True
 
-if len(sys.argv) == 3 :
-    im_base = int(sys.argv[2], 16)
+args = sys.argv[1:]
+
+im_path = args.pop(0)
+
+if args[0] == "-s" :
+        start_opt = False
+        del args[0]
+
+if args[0] == "-t" :
+        term_opt = False
+        del args[0]
+
+if len(args) == 1 :
+    im_base = int(args[0], 16)
 else :
     im_base = 0x10000
 
@@ -530,9 +545,10 @@ print ( " baud rate: {}".format(baud) )
 #slug ()
 #im_load ( im_path, im_base )
 
-run_image ( im_path, im_base )
+run_image ( im_path, im_base, start_opt )
 
-terminal ()
+if term_opt :
+    terminal ()
 
 ser.close()
 

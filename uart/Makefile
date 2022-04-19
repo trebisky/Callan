@@ -54,7 +54,8 @@ getlib:
 
 # Address should match what is in callan.lds
 test: callan.img
-	sloader callan.img 0x10000
+	sloader callan.img -t 0x10000
+	calcon
 
 # As of 3-1-2022, I am using gcc 11.2.1
 version:

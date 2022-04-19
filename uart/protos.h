@@ -2,11 +2,10 @@
  */
 
 void uart_init ( void );
-void uart_putc ( char );
+int uart_getc ( void );
+void uart_putc ( int );
 void uart_puts ( char * );
-
-void hd_init ( void );
-void hd_test ( void );
+void uart_stat ( void );
 
 void printf ( char *, ... );
 void show_reg ( char *, int * );

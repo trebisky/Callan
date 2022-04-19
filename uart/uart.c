@@ -6,6 +6,8 @@
  *
  */
 
+#include "protos.h"
+
 typedef volatile unsigned short vu_short;
 typedef volatile unsigned char vu_char;
 
@@ -29,6 +31,26 @@ uart_init ( void )
 }
 
 void
+uart_stat ( void )
+{
+	struct uart *up = UART0_BASE;
+
+	printf ( "Uart status: %h\n", up->csr );
+}
+
+int
+uart_getc ( void )
+{
+	struct uart *up = UART0_BASE;
+
+	while ( ! (up->csr & CSR_RCA) )
+	    ;
+
+	return ( up->data & 0x7f );
+}
+
+
+void
 uart_putc ( int c )
 {
 	struct uart *up = UART0_BASE;
@@ -49,28 +71,5 @@ uart_puts ( char *s )
             uart_putc(*s++);
         }
 }
-
-#ifdef notdef
-/* I am keeping this here just for the record -- */
-/* You can do this, but you have to shift data 8 bits
- * into or out of the top 8 bits.
- * The scheme below avoids all these shifts and
- * is a better choice I think.
- */
-struct uart {
-	vu_short data;
-	vu_short csr;
-};
-
-void
-putc ( int c )
-{
-	struct uart *up = UART0_BASE;
-
-	while ( ! ((up->csr>>8) & CSR_TBE) )
-	    ;
-	up->data = c << 8;
-}
-#endif
 
 /* THE END */
