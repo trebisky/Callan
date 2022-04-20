@@ -17,3 +17,5 @@ remote "stub" protocol.
 -- cwc-firmware - analysis of firmware in the hard drive controller
 -- hd2 - driver for the hard drive controller after I get good RAM card
 -- uart - improved serial IO for interaction with python script
+-- hd3 - hopefully the final hd driver and contents extraction
+

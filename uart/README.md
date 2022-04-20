@@ -1,8 +1,11 @@
 This is a continuation of my work with the Callan Hard Drive controller
 
-After solving what I think are the last of my hardware problems,
-I decided to save hd1 as a "snapshot" of that effort.
+The game here is to write some stub code to run on the Callan that
+acts as though it is reading sectors.
 
-The code here began as a copy of hd1, but I plan to delete various
-tests and diagnostics and move forward with actually reading
-blocks from the disk.
+Then I work up a serial protocol and a python script that uses
+that protocol to read sectors and record their contents.
+
+This is based on the hd2 project, but without real code
+to talk to the disk controller, it is all about the
+protocol.  After this, we will move on to hd3.

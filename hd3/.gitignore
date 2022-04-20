@@ -1,0 +1,12 @@
+*.o
+*.a
+rom_image
+*.elf
+*.dis
+OLD
+OLD/*
+zzz
+try
+*.dump
+*.img
+Callan.log
