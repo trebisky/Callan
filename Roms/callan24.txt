@@ -1115,14 +1115,14 @@
 ; which has 320 cylinders, 4 physical disks (hence 8 heads)
 ; and can be formatted to 17 sectors of 512 per track.
 
-   20b56:	36bc 0200      	movew #0x200,%a3@
+   20b56:	36bc 0200      	movew #0x200,%a3@		; 512 byte sectors
    20b5a:	176d 021f 0002 	moveb %a5@(543),%a3@(2)		; s/t
    20b60:	176d 021b 0003 	moveb %a5@(539),%a3@(3)		; h/c
-   20b66:	377c 03ff 0004 	movew #0x3ff,%a3@(4)
-   20b6c:	377c 00f0 0006 	movew #0xf0,%a3@(6)
-   20b72:	377c 00f0 0008 	movew #0xf0,%a3@(8)
-   20b78:	177c 009e 000a 	moveb #0xff9e,%a3@(10)
-   20b7e:	177c 000c 000b 	moveb #0xc,%a3@(11)
+   20b66:	377c 03ff 0004 	movew #0x3ff,%a3@(4)		; number of cyl
+   20b6c:	377c 00f0 0006 	movew #0xf0,%a3@(6)		; rwc
+   20b72:	377c 00f0 0008 	movew #0xf0,%a3@(8)		; pre
+   20b78:	177c 009e 000a 	moveb #0x9e,%a3@(10)		; normal step
+   20b7e:	177c 000c 000b 	moveb #0xc,%a3@(11)		; restore step
 
    20b84:	2f3c 0000 000c 	movel #0xc,%sp@-
    20b8a:	42a7           	clrl %sp@-

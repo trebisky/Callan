@@ -189,7 +189,7 @@ run_command ( char *cmd )
 	// printf ( "H = %d\n", h );
 	// printf ( "S = %d\n", s );
 
-	buf = hd_read_sector ( c, h, s, &status);
+	buf = hd_read_sector ( c, h, s, &status, 0);
 	// status = 0x41;
 
 	printf ( "CHS = %d %d %d  %x\n", c, h, s, status );
@@ -229,12 +229,13 @@ user_test ( void )
 void
 start ( void )
 {
-	hd_init ();
 	uart_init ();
 
 	delay_one ();
 
-	// hd_test ();
+	hd_init ();
+
+	hd_test ();
 
 	printf ( "Starting test\n" );
 	user_test ();

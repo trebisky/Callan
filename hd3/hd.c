@@ -22,8 +22,7 @@ typedef volatile unsigned long vu_long;
  * the CWC manual was written from a little endian view.
  */
 struct hd_regs {
-	char _pad0;
-	// vu_char pad;		/* 0 */
+	char _pad0;		/* 0 */
 	vu_char status;		/* 1 */
 	char _pad1;
 	vu_char addr_mid;	/* 3 */
@@ -125,20 +124,44 @@ struct hd_params {
 /* for command timeouts */
 #define LIMIT	500000
 
-void hd_params ( void );
+void hd_params ( int );
 void hd_scan ( void );
 int hd_restore ( void );
 int hd_seek ( int );
 
+/* -------------------------------------------------------- */
+
+/* My drive shows up as unit 0 for CMD_STATUS whether cabled to J4 or J5 */
+/* And the other commands want unit 0 also */
+
+#define	UNIT_FOR_TEST	0
+// #define	UNIT_FOR_TEST	1
+
+// My C setup doesn't handle this properly */
+// int test_unit = UNIT_FOR_TEST;
+int test_unit;
+
 /* Nothing here for now, but this always gets called to start the driver.
+ * My disk indeed responds as unit 0
  */
 void
 hd_init ( void )
 {
+	int s;
+
+	test_unit = UNIT_FOR_TEST;
+	printf ( "Testing unit %d\n", test_unit );
+
 	/* load params for our Rodime drive */
-	hd_params ();
+	hd_params ( 0 );
+	/*
+	hd_params ( 1 );
+	hd_params ( 2 );
+	hd_params ( 3 );
+	*/
 	hd_scan ();
-	hd_restore ();
+	s = hd_restore ();
+	printf ( "Restore -- status = %x\n", s );
 }
 
 /* So far, I have always seen this immediately go busy with no
@@ -229,7 +252,15 @@ hd_show_status ( struct hd_status *hs )
 	printf ( "Status block --\n" );
 	dump_buf ( (void *) hs, sizeof(*hs) );
 
-	printf ( " status: %h\n", hs->stat );
+	if ( hs->stat == 0x80 )
+	    printf ( " status: %h - no error\n", hs->stat );
+	else if ( hs->stat == 0x41 )
+	    printf ( " status: %h - device not ready\n", hs->stat );
+	else if ( hs->stat == 0x22 )
+	    printf ( " status: %h - preamble not found\n", hs->stat );
+	else
+	    printf ( " status: %h  ---\n", hs->stat );
+
 	printf ( " code: %h\n", hs->code );
 	printf ( " unit: %h\n", hs->unit );
 	printf ( " cmd: %h\n", hs->cmd );
@@ -248,22 +279,22 @@ hd_test_cmd ( int cmd, int count )
 {
 	struct hd_cmd *hd_cmd;
 	struct hd_status *hd_status;
-	struct hd_data *hd_data;
+	char *hd_data;
 	int s;
 
 	hd_cmd = (struct hd_cmd *) LOCAL_CMD;
 	hd_status = (struct hd_status *) LOCAL_STATUS;
-	hd_data = (struct hd_data *) LOCAL_DATA;
+	hd_data = (char *) LOCAL_DATA;
 
 	memset ( (char *) hd_cmd, sizeof(*hd_cmd), 0 );
 	memset ( (char *) hd_status, sizeof(*hd_status), 0xab );
-	memset ( (char *) hd_data, sizeof(*hd_status), 0xab );
+	memset ( hd_data, sizeof(*hd_status), 0xab );
 
 	printf ( "Blocks clear\n" );
 	// hd_show_status ( LOCAL_STATUS );
 
 	hd_cmd->cmd = cmd;
-	hd_cmd->unit = 0;
+	hd_cmd->unit = test_unit;
 	hd_cmd->status = (vu_long) DMA_STATUS;
 	hd_cmd->count = count;
 	hd_cmd->addr = (vu_long) DMA_DATA;
@@ -280,7 +311,7 @@ hd_test_cmd ( int cmd, int count )
 	printf ( "Waiting done\n" );
 
 	hd_show_status ( (struct hd_status *) LOCAL_STATUS );
-	hd_show_data ( (char *) LOCAL_DATA, count );
+	hd_show_data ( hd_data, count );
 }
 
 void
@@ -308,12 +339,10 @@ hd_get_status ( int unit )
 {
 	struct hd_cmd *hd_cmd;
 	struct hd_status *hd_status;
-	// struct hd_data *hd_data;
 	int s;
 
 	hd_cmd = (struct hd_cmd *) LOCAL_CMD;
 	hd_status = (struct hd_status *) LOCAL_STATUS;
-	// hd_data = (struct hd_data *) LOCAL_DATA;
 
 	memset ( (char *) hd_cmd, sizeof(*hd_cmd), 0 );
 	memset ( (char *) hd_status, sizeof(*hd_status), 0xab );
@@ -333,7 +362,6 @@ hd_get_status ( int unit )
 	hd_wait ( 0 );
 
 	hd_show_status ( (struct hd_status *) LOCAL_STATUS );
-	// hd_show_data ( (char *) LOCAL_DATA, count );
 }
 
 /* With cable on J5, I see unit 0 status of 0x80
@@ -345,15 +373,18 @@ hd_scan ( void )
 {
 	printf ( "Check unit 0 status\n" );
 	hd_get_status ( 0 );
+	/*
 	printf ( "Check unit 1 status\n" );
 	hd_get_status ( 1 );
 	printf ( "Check unit 2 status\n" );
 	hd_get_status ( 2 );
 	printf ( "Check unit 3 status\n" );
 	hd_get_status ( 3 );
+	*/
 }
 
-#define SECTOR_SIZE	512
+// #define SECTOR_SIZE	512
+#define SECTOR_SIZE	256
 
 /* This is hd_test_cmd() copied and modified.
  * The first time I tried it, it complained that a disk parameter block
@@ -362,12 +393,17 @@ hd_scan ( void )
  * This is "preamble not found in 3 revolutions"
  */
 char *
-hd_read_sector ( int c, int h, int s, int *status )
+hd_read_sector ( int c, int h, int s, int *status, int verbose )
 {
 	struct hd_cmd *hd_cmd;
 	struct hd_status *hd_status;
 	char *hd_data;
 	int stat;
+
+	if ( verbose ) {
+	    printf ( "Read sector for unit %d\n", test_unit );
+	    printf ( "  CHS = %d %d %d\n", c, h, s );
+	}
 
 #ifdef notdef
 	/* Throw this in, though it ought not be needed */
@@ -387,10 +423,12 @@ hd_read_sector ( int c, int h, int s, int *status )
 	// hd_show_status ( LOCAL_STATUS );
 
 	hd_cmd->cmd = CMD_READ;
-	hd_cmd->unit = 0;
+	hd_cmd->unit = test_unit;
+
 	hd_cmd->head = h;
 	hd_cmd->sector = s;
 	hd_cmd->cyl = c;
+
 	hd_cmd->status = (vu_long) DMA_STATUS;
 	hd_cmd->count = SECTOR_SIZE;
 	hd_cmd->addr = (vu_long) DMA_DATA;
@@ -407,8 +445,10 @@ hd_read_sector ( int c, int h, int s, int *status )
 	hd_wait ( 0);
 	// printf ( "Waiting done\n" );
 
-	// hd_show_status ( (struct hd_status *) LOCAL_STATUS );
-	// hd_show_data ( (char *) LOCAL_DATA, SECTOR_SIZE );
+	if ( verbose ) {
+	    hd_show_status ( (struct hd_status *) LOCAL_STATUS );
+	    hd_show_data ( (char *) LOCAL_DATA, SECTOR_SIZE );
+	}
 
 	*status = hd_status->stat;
 	return ( hd_data );
@@ -431,11 +471,11 @@ hd_restore ( void )
 	memset ( (char *) hd_status, sizeof(*hd_status), 0xab );
 
 	hd_cmd->cmd = CMD_RESTORE;
-	hd_cmd->unit = 0;
+	hd_cmd->unit = test_unit;
 	hd_cmd->status = (vu_long) DMA_STATUS;
 
 	/* should not be any data */
-	hd_cmd->count = sizeof(struct hd_params);
+	hd_cmd->count = 8;
 	hd_cmd->addr = (vu_long) DMA_DATA;
 
 	stat = hd_start ( 0 );
@@ -464,12 +504,12 @@ hd_seek ( int cyl )
 	memset ( (char *) hd_status, sizeof(*hd_status), 0xab );
 
 	hd_cmd->cmd = CMD_SEEK;
-	hd_cmd->unit = 0;
+	hd_cmd->unit = test_unit;
 	hd_cmd->cyl = cyl;
 	hd_cmd->status = (vu_long) DMA_STATUS;
 
 	/* should not be any data */
-	hd_cmd->count = sizeof(struct hd_params);
+	hd_cmd->count = 8;
 	hd_cmd->addr = (vu_long) DMA_DATA;
 
 	stat = hd_start ( 0 );
@@ -488,6 +528,7 @@ hd_seek ( int cyl )
 /* I have a Rodime 204 drive
  * This has 320 cylinders and 8 heads (4 platters)
  * It can be formatted to have 17 sectors of 512 bytes
+ * or it can be formatted to have 32 sectors of 256 bytes
  * Values below are pulled from the Aux ROM disassembly.
  * Note in particular the big value for "ncyl"
  */
@@ -495,12 +536,15 @@ hd_seek ( int cyl )
 /* And this is hd_read_sector() copied and modified.
  */
 void
-hd_params ( void )
+hd_params ( int unit )
 {
 	struct hd_cmd *hd_cmd;
 	struct hd_status *hd_status;
 	struct hd_params *hd_params;
 	int stat;
+
+	printf ( "Set drive parameters for unit %d\n", unit );
+	printf ( "Size of params block: %d bytes\n", sizeof(struct hd_params) );
 
 	hd_cmd = (struct hd_cmd *) LOCAL_CMD;
 	hd_status = (struct hd_status *) LOCAL_STATUS;
@@ -512,17 +556,28 @@ hd_params ( void )
 
 	/* Now load stuff for our Rodime RO 204 */
 	/* We never intend to write, so ignore rwc and pre */
+#define SEC_256
+#ifdef SEC_256
+	printf ( "Configure for 32 sectors of 256 bytes\n" );
+	/* so far untested but is probably correct */
+	hd_params->sector_size = 256;
+	hd_params->spt = 32;
+#else
+	/* does not work */
+	printf ( "Configure for 17 sectors of 512 bytes\n" );
 	hd_params->sector_size = 512;
-	hd_params->heads = 8;
 	hd_params->spt = 17;
+#endif
+	hd_params->heads = 8;
 	hd_params->ncyl = 0x3ff;
+
 	// hd_params->rwc = 0xf0;
 	// hd_params->pre = 0xf0;
 	hd_params->step_norm = 0x9e;
 	hd_params->step_restore = 0xc;
 
 	hd_cmd->cmd = CMD_PARAMS;
-	hd_cmd->unit = 0;
+	hd_cmd->unit = unit;
 	hd_cmd->status = (vu_long) DMA_STATUS;
 	hd_cmd->count = sizeof(struct hd_params);
 	hd_cmd->addr = (vu_long) DMA_DATA;
@@ -539,110 +594,6 @@ hd_params ( void )
 }
 
 /* =========================================================================== */
-/* =========================================================================== */
-/* =========================================================================== */
-
-/* mid always reads as zero.
- */
-void
-hd_test2 ( void )
-{
-	struct hd_regs *hp = HD_BASE;
-	int x;
-
-	x = hp->addr_mid;
-	printf ( "Mid: %x\n", x );
-
-	hp->addr_mid = 0x55;
-	x = hp->addr_mid;
-	printf ( "Mid: %x\n", x );
-
-	hp->addr_mid = ~0x55;
-	x = hp->addr_mid;
-	printf ( "Mid: %x\n", x );
-}
-
-#ifdef notdef
-/* pad also always reads as zero.
- * note that no error happens if you access it
- */
-void
-hd_test3 ( void )
-{
-	struct hd_regs *hp = HD_BASE;
-	int x;
-
-	x = hp->pad;
-	printf ( "Pad: %x\n", x );
-
-	hp->pad = 0x55;
-	x = hp->pad;
-	printf ( "Pad: %x\n", x );
-
-	hp->pad = ~0x55;
-	x = hp->pad;
-	printf ( "Pad: %x\n", x );
-}
-#endif
-
-/* this however gives:
- * Bus Error, addr: 001F00A8 at 010A2A
- */
-void
-hd_test4 ( void )
-{
-	struct hd_regs *hp = HD_BASE;
-	int x;
-
-	x = hp->bad;
-	printf ( "Bad: %x\n", x );
-
-	hp->bad = 0x55;
-	x = hp->bad;
-	printf ( "Bad: %x\n", x );
-
-	hp->bad = ~0x55;
-	x = hp->bad;
-	printf ( "Bad: %x\n", x );
-}
-
-/* This returns 0 forever */
-void
-hd_test5 ( void )
-{
-	struct hd_regs *hp = HD_BASE;
-	int x;
-	int n;
-
-	n = 0;
-	for ( ;; ) {
-	    // delay_x ();
-	    delay_one ();
-	    n++;
-	    x = hp->status;
-	    printf ( "Status: %x %d\n", x, n );
-	}
-}
-
-/* I run this and get:
- *  Exception: Tr
- * While waiting for the command
- */
-void
-hd_test1 ( void )
-{
-	struct hd_regs *hp = HD_BASE;
-	int s;
-
-	s = hp->status;
-	printf ( "Controller status: %h\n", s );
-
-#ifdef notdef
-	printf ( " --- --- Reset controller\n" );
-	hd_reset_controller ();
-#endif
-}
-
 /* =========================================================================== */
 /* =========================================================================== */
 
@@ -685,7 +636,6 @@ Data block --
  *   this makes sense (we put the status block at 0x200)
  */
 
-#ifdef notdef
 void
 hd_test_read ( void )
 {
@@ -693,9 +643,10 @@ hd_test_read ( void )
 	int stat;
 
 	printf ( " --- --- Read sector\n" );
-	(void) hd_read_sector ( 0, 0, 0, &stat );
+	(void) hd_read_sector ( 0, 0, 0, &stat, 1 );
 }
 
+#ifdef notdef
 void
 hd_test_params ( void )
 {
@@ -726,17 +677,13 @@ seek_test ( void )
 void
 hd_test ( void )
 {
-	// hd_test2 ();
-	// hd_test3 ();
-	// hd_test4 ();
-	// hd_test5 ();
-
 	// hd_test_rram ();
 	// hd_test_status ();
 
 	// hd_test_params ();
-	// hd_test_read ();
-	seek_test ();
+	hd_test_read ();
+
+	// seek_test ();
 }
 
 void

@@ -1,9 +1,10 @@
 /* prototypes
  */
 
+void hd_params ( int );
 void hd_init ( void );
 void hd_test ( void );
-char *hd_read_sector ( int, int, int, int * );
+char *hd_read_sector ( int, int, int, int *, int );
 
 void uart_init ( void );
 int uart_getc ( void );
