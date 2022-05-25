@@ -19,4 +19,4 @@ remote "stub" protocol.
 -- hd2 - driver for the hard drive controller after I get good RAM card
 -- uart - improved serial IO for interaction with python script
 -- hd3 - hopefully the final hd driver and contents extraction
-
+-- mfm - the mfm_dump tool to dump tracks from a Gesswein transitions file
