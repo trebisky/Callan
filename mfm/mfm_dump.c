@@ -24,6 +24,7 @@ char * tran_path = "callan_raw1";
 
 void tran_read_all ( char * );
 void tran_read_deltas ( char *, int, int, u_short *, int * );
+void mfm_scan_marks ( int, int, u_short *, int );
 void mfm_decode_deltas ( int, int, u_short *, int );
 
 /* ------------------------------ */
@@ -74,7 +75,8 @@ main ( int argc, char **argv )
 {
     // tran_read_all ( tran_path );
     tran_read_deltas ( tran_path, MY_CYL, MY_HEAD, deltas, &ndeltas );
-    mfm_decode_deltas ( MY_CYL, MY_HEAD, deltas, ndeltas );
+    // mfm_decode_deltas ( MY_CYL, MY_HEAD, deltas, ndeltas );
+    mfm_scan_marks ( MY_CYL, MY_HEAD, deltas, ndeltas );
 
     return 0;
 }
@@ -119,7 +121,7 @@ tran_read_all ( char *path )
     close ( fd );
 }
 
-/* My data doesn't have any 2 or 3 bytes counts,
+/* My data doesn't have any 2 or 3 byte counts,
  * so this boils down to a plain copy.
  */
 void
@@ -196,6 +198,91 @@ tran_read_deltas ( char *path, int cyl, int head, u_short *deltas, int *ndeltas 
 }
 
 /* -------------------------------------------------------- */
+/* -------------------------------------------------------- */
+
+/* Appropriate for WD1006 family */
+#define CONTROLLER_HZ	10000000
+
+#define PRU_HZ		200.0e6		/* 200 Mhz */
+
+// Type II PLL. Here so it will inline. Converted from continuous time
+// by bilinear transformation. Coefficients adjusted to work best with
+// my data. Could use some more work.
+static inline float
+filter(float v, float *delay)
+{
+   float in, out;
+
+   in = v + *delay;
+   out = in * 0.034446428576716f + *delay * -0.034124999994713f;
+   *delay = in;
+   return out;
+}
+
+/* Look at the entire track and report all of the 0xA1 marks we find
+ * This is useful to determine the number of sectors/track.
+ * Each section should have a header mark and a data mark.
+ */
+void
+mfm_scan_marks ( int cyl, int head, u_short *deltas, int ndeltas )
+{
+    int i;
+    int bit_pos;
+
+    /* These are values in units of 200 Mhz clocks.
+     * The value will be 20.0 for a 10 Mhz clock.
+     */
+    float avg_bit_sep_time;
+    float nominal_bit_sep_time;
+
+    int track_time = 0;
+    float clock_time = 0.0;
+    float filter_state = 0;
+
+    // This is the raw MFM data decoded with above
+    u_int raw_word = 0;
+
+    int mark = 0;
+
+    /* -------- */
+
+    nominal_bit_sep_time = PRU_HZ / CONTROLLER_HZ;
+
+    avg_bit_sep_time = nominal_bit_sep_time;
+    printf ( "Initial bit sep time: %.3f\n", avg_bit_sep_time );
+
+    // printf ( "First deltas: %d %d %d\n", deltas[0], deltas[1], deltas[2] );
+
+    for ( i=1; i< ndeltas; i++ ) {
+	track_time += deltas[i];
+	clock_time += deltas[i];
+
+	for (bit_pos = 0; clock_time > avg_bit_sep_time / 2;
+               clock_time -= avg_bit_sep_time, bit_pos++) ;
+
+	 avg_bit_sep_time = nominal_bit_sep_time + filter(clock_time, &filter_state);
+
+	 /* If the shift is bigger than the word size, then
+	  * it pushes the already accumulated bits entirely out
+	  * of the word.  This would only happen if something
+	  * out of the ordinary was going on.
+	  */
+         if (bit_pos >= sizeof(raw_word)*8) {
+            raw_word = 1;
+         } else {
+            raw_word = (raw_word << bit_pos) | 1;
+         }
+
+	 if ((raw_word & 0xffff) == 0x4489) {
+	    mark++;
+	    printf ( "Mark (A1) %d at index %d of %d\n", mark, i, ndeltas );
+	}
+    }
+
+    printf ( "final filtered bit sep time: %.3f\n", avg_bit_sep_time );
+}
+
+/* -------------------------------------------------------- */
 /* MFM decode stuff */
 
 // Define states for processing the data.
@@ -223,19 +310,6 @@ STATE_TYPE;
 // header should be used to help separate good from false ID.
 // also ignoring known write splice location should help.
 #define MARK_NUM_ZEROS 2
-
-// Type II PLL. Here so it will inline. Converted from continuous time
-// by bilinear transformation. Coefficients adjusted to work best with
-// my data. Could use some more work.
-static inline float filter(float v, float *delay)
-{
-   float in, out;
-
-   in = v + *delay;
-   out = in * 0.034446428576716f + *delay * -0.034124999994713f;
-   *delay = in;
-   return out;
-}
 
 // Various convenience macros
 #define ARRAYSIZE(x) (sizeof(x) / sizeof(x[0]))
@@ -441,8 +515,11 @@ typedef struct {
    int first_header_min_bits;
 } CONTROLLER;
 
+/* This is the wd1006 entry, but note the 256 byte sector size XXX */
+// I hack and make it 512, we will see how this goes
+//    {"WD_1006",              256, 10000000,      0,
 static CONTROLLER my_controller = 
-    {"WD_1006",              256, 10000000,      0,
+    {"WD_1006",              512, 10000000,      0,
          4, ARRAYSIZE(mfm_all_poly), 4, ARRAYSIZE(mfm_all_poly),
          0, ARRAYSIZE(mfm_all_init), CINFO_CHS,
          5, 2, 0, 0, CHECK_CRC, CHECK_CRC,
@@ -452,6 +529,33 @@ static CONTROLLER my_controller =
          0, 0, 0
     };
 
+// The possible states from reading each sector.
+
+// These are ORed into the state
+// This is set if information is found such as sector our of the expected
+// range. If MODEL controller mostly matches but say has one less sector than
+// the disk has it was being selected instead of going on to ANALYZE
+#define ANALYZE_WRONG_FORMAT 0x1000
+// If this is set the data being CRC'd is zero so the zero CRC
+// result is ambiguous since any polynomial will match
+#define SECT_AMBIGUOUS_CRC 0x800
+// If set treat as error for analyze but otherwise ignore it
+#define SECT_ANALYZE_ERROR 0x400
+// Set if the sector number is bad when BAD_HEADER is not set.
+// Some formats use bad sector numbers to flag bad blocks
+#define SECT_BAD_LBA_NUMBER 0x200
+#define SECT_BAD_SECTOR_NUMBER 0x100
+// This is used to mark sectors that are spare sectors or are marked
+// bad and don't contain user data.
+// It suppresses counting as errors other errors seen.
+#define SECT_SPARE_BAD      0x100
+#define SECT_ZERO_HEADER_CRC 0x80
+#define SECT_ZERO_DATA_CRC  0x40
+#define SECT_HEADER_FOUND   0x20
+#define SECT_ECC_RECOVERED  0x10
+#define SECT_WRONG_CYL      0x08
+// Sector hasn't been written yet
+#define SECT_NOT_WRITTEN    0x04
 // Only one of these three will be set. BAD_HEADER is initially set
 // until we find a good header, then BAD_DATA is set until we find good data
 #define SECT_BAD_HEADER     0x02
@@ -529,8 +633,6 @@ SECTOR_DECODE_STATUS mfm_process_bytes (
         int *, int *,
 	SECTOR_STATUS *, SECTOR_DECODE_STATUS );
 
-
-
 /* To start with, I am just robbing code from
  * wd_mfm_decode_track_deltas() in David's wd_mfm_decoder.c
  */
@@ -551,11 +653,11 @@ mfm_decode_deltas ( int cyl, int head, u_short *deltas, int ndeltas )
     float filter_state = 0;
 
     // This is the raw MFM data decoded with above
-    unsigned int raw_word = 0;
-    int tmp_raw_word;
+    u_int raw_word = 0;
 
     // The decoded bits
-    unsigned int decoded_word = 0;
+    u_int decoded_word = 0;
+
     // Counter to know when we have a bytes worth
     int decoded_bit_cntr = 0;
 
@@ -602,17 +704,30 @@ mfm_decode_deltas ( int cyl, int head, u_short *deltas, int ndeltas )
     // Where we are in decoding a sector, Start looking for header ID mark
     STATE_TYPE state = MARK_ID;
 
+    // Status of decoding returned
+    SECTOR_DECODE_STATUS all_sector_status = SECT_NO_STATUS;
+
+    // Sequential counter for counting sectors
+    int sector_index = 0;
+
     int click = 0;
+
+    /* These would have been arguments to this routine */
+    int _seek_difference_static;
+    int *seek_difference;
+    SECTOR_STATUS sector_status_list[64];
 
     CONTROLLER *cont = &my_controller;
 
     /* --- */
 
+    seek_difference = &_seek_difference_static;
+
     nominal_bit_sep_time = 200.0e6 / my_controller.clk_rate_hz;
     avg_bit_sep_time = nominal_bit_sep_time;
     // printf ( "bit sep time: %d\n", avg_bit_sep_time );
 
-    printf ( "First delta: %d\n", deltas[0] );
+    printf ( "First deltas: %d %d %d\n", deltas[0], deltas[1], deltas[2] );
 
     for ( i=1; i< ndeltas; i++ ) {
 	track_time += deltas[i];
@@ -643,11 +758,12 @@ mfm_decode_deltas ( int cyl, int head, u_short *deltas, int ndeltas )
             raw_word = (raw_word << int_bit_pos) | 1;
          }
 
-	 click++;
-	 printf ( "Raw word %8d: %x\n", click,raw_word );
-
          tot_raw_bit_cntr += int_bit_pos;
          raw_bit_cntr += int_bit_pos;
+
+	 click++;
+	 /* I see int_bit_pos of 2, 3, 4 */
+	 // printf ( "Raw word %8d: %x (%d,%d)\n", click, raw_word, int_bit_pos, raw_bit_cntr );
 
          // Are we looking for a mark code?
          if ((state == MARK_ID || state == MARK_DATA)) {
@@ -772,14 +888,16 @@ mfm_decode_deltas ( int cyl, int head, u_short *deltas, int ndeltas )
 	 } else if (state == MARK_DATA2) {
 	    error ( "MARK_DATA2" );	// special for ROHM_PBX
 
-	 } else { // PROCESS_DATA
+	 // } else { // PROCESS_DATA
+	 } else if (state == PROCESS_DATA || state == PROCESS_HEADER) {
+
+	    // printf ( "Process data/header (%d)\n", i );
+	    // error ( "not ready to process data" );
+
+            // Loop while we have enough bits to decode. Stop if state changes
             int entry_state = state;
-
-	    printf ( "Process data (%d)\n", i );
-	    error ( "not ready to process data" );
-
-            // If we have enough bits to decode do so. Stop if state changes
             while (raw_bit_cntr >= 4 && entry_state == state) {
+	       u_int tmp_raw_word;
                // If we have more than 4 only process 4 this time
                raw_bit_cntr -= 4;
                tmp_raw_word = raw_word >> raw_bit_cntr;
@@ -789,6 +907,7 @@ mfm_decode_deltas ( int cyl, int head, u_short *deltas, int ndeltas )
                // And if we have a bytes worth store it
                if (decoded_bit_cntr >= 8) {
                   // Do we have enough to further process?
+
                   if (byte_cntr < bytes_needed) {
                      // If sufficent bits we may have missed a header
                      // 7 is 2 MFM encoded bits and extra for fill fields.
@@ -799,6 +918,11 @@ mfm_decode_deltas ( int cyl, int head, u_short *deltas, int ndeltas )
                         int ecc_span;
                         SECTOR_DECODE_STATUS init_status = 0;
 
+/* I am hacking away, hoping to skip over CRC calculation stuff
+ * I just want to dump content.
+ */
+#define TJT
+
 	#ifdef notyet
                         // Don't perform ECC corrections. They can be
                         // false corrections when not actually sector header.
@@ -807,7 +931,18 @@ mfm_decode_deltas ( int cyl, int head, u_short *deltas, int ndeltas )
                            &ecc_span, &init_status, 0);
 	#endif
 
-	#ifdef notyet
+	#ifdef TJT
+			   /* **************** here is where we process bytes.
+			    * This bounces through mfm_process_bytes()
+			    * in mfm_decoder.c back to wd_process_data()()
+			    * in this same file.
+			    */ 
+                           // all_sector_status |= mfm_process_bytes(drive_params, bytes,
+                           all_sector_status |= mfm_process_bytes( &bogus_params, bytes,
+                              bytes_crc_len, bytes_needed, &state, cyl, head,
+                              &sector_index, seek_difference, sector_status_list, 0);
+
+	#else
                         // We will only get here if processing as data. If
                         // we found a header with good CRC switch to processing
                         // it as a header. Poly != 0 for my testing
@@ -819,11 +954,6 @@ mfm_decode_deltas ( int cyl, int head, u_short *deltas, int ndeltas )
                            bytes_crc_len = header_bytes_crc_len;
                            bytes_needed = header_bytes_needed;
 
-			   /* **************** here is where we process bytes.
-			    * This bounces through mfm_process_bytes()
-			    * in mfm_decoder.c back to wd_process_data()()
-			    * in this same file.
-			    */ 
                            all_sector_status |= mfm_process_bytes(drive_params, bytes,
                               bytes_crc_len, bytes_needed, &state, cyl, head,
                               &sector_index, seek_difference, sector_status_list, 0);
@@ -833,6 +963,7 @@ mfm_decode_deltas ( int cyl, int head, u_short *deltas, int ndeltas )
 
 		     /* ***** Here is where bytes accumulate */
 		     bytes[byte_cntr++] = decoded_word;
+		     printf ( "Add byte %8d: %02x (%d)\n", i, decoded_word&0xff, byte_cntr );
 
                      if (byte_cntr == header_bytes_needed && state == PROCESS_DATA) {
                         // Didn't find header so mark location previously found
@@ -842,6 +973,9 @@ mfm_decode_deltas ( int cyl, int head, u_short *deltas, int ndeltas )
 	#endif
                      }
                   } else {
+
+		     /* Here when "bytes needed" is satisfied */
+
                      int force_bad = SECT_NO_STATUS;
 
                      // If data header too far from sector header mark bad.
@@ -857,17 +991,21 @@ mfm_decode_deltas ( int cyl, int head, u_short *deltas, int ndeltas )
                      }
 	#ifdef notyet
                      mfm_mark_end_data(all_raw_bits_count, drive_params);
+	#endif
 
-                     all_sector_status |= mfm_process_bytes(drive_params, bytes,
+                     // all_sector_status |= mfm_process_bytes(drive_params, bytes,
+                     all_sector_status |= mfm_process_bytes( &bogus_params, bytes,
                         bytes_crc_len, bytes_needed, &state, cyl, head,
                         &sector_index, seek_difference, sector_status_list,
                         force_bad);
-	#endif
                   }
                   decoded_bit_cntr = 0;
                }
-            }
+            }  // end of decode loop
          } /* end of process data */
+	 else {
+	    error ( "Unknown state" );
+	 }
 
     }	/* end of deltas loop */
 }
@@ -930,9 +1068,33 @@ SECTOR_DECODE_STATUS mfm_process_bytes(DRIVE_PARAMS *drive_params,
       // Search for header in case we are out of sync. If we found
       // data next we can't process it anyway.
       *state = MARK_ID;
+      printf ( "Out of sync, return to MARK_ID\n" );
    }
    return status;
 }
+
+// Perform 3 head bit correction
+//
+// drive_params: Drive parameters
+// head: Head value from header
+// exp_head: Expected head
+// return: Corrected head value
+int
+mfm_fix_head(DRIVE_PARAMS *drive_params, int exp_head, int head)
+{
+#ifdef notdef
+   // WD 1003 controllers wrote 3 bit head code so head 8 is written as 0.
+   // If requested and head seems correct fix read head value.
+   //printf("3 bit %d, head %d exp %d\n",drive_params->head_3bit, head, exp_head);
+   if (drive_params->head_3bit && head == (exp_head & 0x7)) {
+      return exp_head;
+   } else {
+      return head;
+   }
+#endif
+      return head;
+}
+
 
 SECTOR_DECODE_STATUS wd_process_data(STATE_TYPE *state, u_char bytes[],
       int total_bytes,
@@ -941,6 +1103,155 @@ SECTOR_DECODE_STATUS wd_process_data(STATE_TYPE *state, u_char bytes[],
       SECTOR_STATUS sector_status_list[], int ecc_span,
       SECTOR_DECODE_STATUS init_status)
 {
+   static int sector_size;
+   // Non zero if sector is a bad block, has alternate track assigned,
+   // or is an alternate track
+   static int bad_block, alt_assigned, is_alternate, alt_assigned_handled;
+   static SECTOR_STATUS sector_status;
+   // 0 after first sector marked spare/bad found. Only used for Adaptec
+   static int first_spare_bad_sector = 1;
+
+    /* ******************************************************* */
+    /* ******************************************************* */
+    if (*state == PROCESS_HEADER) {
+	printf ( "in wd_process_data - header\n" );
+
+	// Clear these since not used by all formats
+      alt_assigned = 0;
+      alt_assigned_handled = 0;
+      is_alternate = 0;
+      bad_block = 0;
+
+      memset(&sector_status, 0, sizeof(sector_status));
+      sector_status.status |= init_status | SECT_HEADER_FOUND;
+      sector_status.ecc_span_corrected_header = ecc_span;
+      if (ecc_span != 0) {
+         sector_status.status |= SECT_ECC_RECOVERED;
+      }
+
+	/* Following is for CONTROLLER_WD_1006 */
+	 int sector_size_lookup[4] = {256, 512, 1024, 128};
+         int cyl_high_lookup[16] = {0,1,2,3,-1,-1,-1,-1,4,5,6,7,-1,-1,-1,-1};
+         int cyl_high;
+
+         cyl_high = cyl_high_lookup[(bytes[1] & 0xf) ^ 0xe];
+         sector_status.cyl = 0;
+         if (cyl_high != -1) {
+            sector_status.cyl = cyl_high << 8;
+         }
+         sector_status.cyl |= bytes[2];
+
+         sector_status.head = mfm_fix_head(drive_params, exp_head, bytes[3] & 0xf);
+
+	 sector_size = sector_size_lookup[(bytes[3] & 0x60) >> 5];
+
+         bad_block = (bytes[3] & 0x80) >> 7;
+
+         sector_status.sector = bytes[4];
+
+ #ifdef notdef
+         // 3B1 with P5.1 stores 4th head bit in bit 5 of sector number field.
+         if (drive_params->controller == CONTROLLER_WD_3B1) {
+            sector_status.head = sector_status.head | ((sector_status.sector & 0xe0) >> 2);
+            sector_status.sector &= 0x1f;
+         }
+ #endif
+
+         if (cyl_high == -1) {
+            //msg(MSG_INFO, "Invalid header id byte %02x on cyl %d,%d head %d,%d sector %d\n",
+            //      bytes[1], exp_cyl, sector_status.cyl,
+            //      exp_head, sector_status.head, sector_status.sector);
+	    printf ( "Invalid header id byte\n" );
+
+            sector_status.status |= SECT_BAD_HEADER;
+         }
+
+	 printf ( "Got exp\n" );
+	 // msg(MSG_DEBUG,
+         //  "Got exp %d,%d cyl %d head %d sector %d,%d size %d bad block %d\n",
+         //     exp_cyl, exp_head, sector_status.cyl, sector_status.head,
+         //     sector_status.sector, *sector_index, sector_size, bad_block);
+
+      if (bad_block) {
+         sector_status.status |= SECT_SPARE_BAD;
+         // msg(MSG_INFO,"Bad block set on cyl %d, head %d, sector %d\n",
+         //       sector_status.cyl, sector_status.head, sector_status.sector);
+	 printf ( "bad block\n" );
+      }
+
+      if (is_alternate) {
+         // msg(MSG_INFO,"Alternate cylinder set on cyl %d, head %d, sector %d\n",
+         //       sector_status.cyl, sector_status.head, sector_status.sector);
+	 printf ( "alt cylinder\n" );
+      }
+
+#ifdef notdef
+      mfm_check_header_values(exp_cyl, exp_head, sector_index, sector_size,
+            seek_difference, &sector_status, drive_params, sector_status_list);
+#endif
+
+
+    /* ******************************************************* */
+    /* ******************************************************* */
+    } else if (*state == PROCESS_DATA) {
+	printf ( "in wd_process_data - data\n" );
+
+    // Value and where to look for header mark byte
+      int id_byte_expected = 0xf8;
+      int id_byte_index = 1;
+      int id_byte_mask = 0xff;
+
+      sector_status.status |= init_status;
+
+      if (id_byte_index != -1 &&
+            (bytes[id_byte_index] & id_byte_mask) != id_byte_expected &&
+            crc == 0) {
+         //msg(MSG_INFO,"Invalid data id byte %02x expected %02x on cyl %d head %d sector %d\n",
+         //      bytes[id_byte_index], id_byte_expected,
+         //      sector_status.cyl, sector_status.head, sector_status.sector);
+	 printf ( "Invalid data id byte\n" );
+         sector_status.status |= SECT_BAD_DATA;
+      }
+      if (crc != 0) {
+         sector_status.status |= SECT_BAD_DATA;
+      }
+      if (ecc_span != 0) {
+         sector_status.status |= SECT_ECC_RECOVERED;
+      }
+      sector_status.ecc_span_corrected_data = ecc_span;
+
+      // TODO: If bad sector number the stats such as count of spare/bad
+      // sectors is not updated. We need to know the sector # to update
+      // our statistics array. This happens with RQDX3
+      if (!(sector_status.status & (SECT_BAD_HEADER | SECT_BAD_SECTOR_NUMBER))) {
+
+         // int dheader_bytes = mfm_controller_info[drive_params->controller].data_header_bytes;
+         int dheader_bytes = my_controller.data_header_bytes;
+
+#ifdef notdef
+         // Bytes[1] is because 0xa1 can't be updated from bytes since
+         // won't get encoded as special sync pattern
+         if (mfm_write_sector(&bytes[dheader_bytes], drive_params, &sector_status,
+               sector_status_list, &bytes[1], total_bytes-1) == -1) {
+            sector_status.status |= SECT_BAD_HEADER;
+         }
+#endif
+      }
+      if (alt_assigned && !alt_assigned_handled) {
+         // msg(MSG_INFO,"Assigned alternate cylinder not corrected on cyl %d, head %d, sector %d\n",
+         //       sector_status.cyl, sector_status.head, sector_status.sector);
+	 printf ( "Assigned alt cyl not corrected\n" );
+      }
+
+      *state = MARK_ID;
+      printf ( "state back to MARK_ID\n" );
+
+    /* ******************************************************* */
+    /* ******************************************************* */
+    } else
+	printf ( "in wd_process_data - UNKNOWN !!!\n" );
+
+    return sector_status.status;
 }
 
 /* THE END */
