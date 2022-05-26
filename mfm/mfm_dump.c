@@ -15,9 +15,11 @@ typedef unsigned short u_short;
 typedef unsigned int u_int;
 typedef unsigned long u_int64;
 
+/* Edit the following to specify your file and track
+ */
 char * tran_path = "callan_raw1";
-
-#define MY_CYL	100
+//#define MY_CYL	100
+#define MY_CYL	180
 #define MY_HEAD	3
 
 /* ------------------------------ */
@@ -25,7 +27,9 @@ char * tran_path = "callan_raw1";
 void tran_read_all ( char * );
 void tran_read_deltas ( char *, int, int, u_short *, int * );
 void mfm_scan_marks ( int, int, u_short *, int );
-void mfm_decode_deltas ( int, int, u_short *, int );
+void mfm_scan_headers ( int, int, u_short *, int );
+
+// void mfm_decode_deltas ( int, int, u_short *, int );
 
 /* ------------------------------ */
 
@@ -75,8 +79,14 @@ main ( int argc, char **argv )
 {
     // tran_read_all ( tran_path );
     tran_read_deltas ( tran_path, MY_CYL, MY_HEAD, deltas, &ndeltas );
+
+    // forget about this.
     // mfm_decode_deltas ( MY_CYL, MY_HEAD, deltas, ndeltas );
-    mfm_scan_marks ( MY_CYL, MY_HEAD, deltas, ndeltas );
+
+    /* Uncomment one of these according to what you want to do.
+     */
+    // mfm_scan_marks ( MY_CYL, MY_HEAD, deltas, ndeltas );
+    mfm_scan_headers ( MY_CYL, MY_HEAD, deltas, ndeltas );
 
     return 0;
 }
@@ -205,6 +215,13 @@ tran_read_deltas ( char *path, int cyl, int head, u_short *deltas, int *ndeltas 
 
 #define PRU_HZ		200.0e6		/* 200 Mhz */
 
+/* This converts the MFM clock and data bits into data bits.
+ * Once we are synchronized, we take 4 bits at a time and use
+ * them to index this table.  This gives us 2 bits of actual data.
+ */
+static int code_bits[16] = { 0, 1, 0, 0, 2, 3, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0 };
+
+
 // Type II PLL. Here so it will inline. Converted from continuous time
 // by bilinear transformation. Coefficients adjusted to work best with
 // my data. Could use some more work.
@@ -282,8 +299,207 @@ mfm_scan_marks ( int cyl, int head, u_short *deltas, int ndeltas )
     printf ( "final filtered bit sep time: %.3f\n", avg_bit_sep_time );
 }
 
+#ifdef notdef
+void
+dump_em ( char *msg, u_char *bytes, int num )
+{
+    int i;
+
+    // printf ( "Dump %d bytes (%s)\n", num, msg );
+    printf ( "Dump (%s)", msg );
+    for ( i=0; i<num; i++ )
+	printf ( " %02x", bytes[i] );
+    printf ( "\n" );
+}
+#endif
+
+#define WRAP_LEN	32
+
+void
+emit_c ( int c )
+{
+    if ( c > 0x1f && c < 0x7f )
+	printf ( "%c", c );
+    else
+	printf ( "." );
+}
+
+/* Recursion - just for fun
+ * Also fix byte swapped data for text display
+ */
+void
+dump_em ( char *msg, u_char *bytes, int num, int text )
+{
+    int i;
+
+    if ( num > WRAP_LEN ) {
+	dump_em ( msg, bytes, WRAP_LEN, text );
+	dump_em ( msg, &bytes[WRAP_LEN], num-WRAP_LEN, text );
+    } else {
+	printf ( "Dump (%s)", msg );
+	for ( i=0; i<num; i++ )
+	    printf ( " %02x", bytes[i] );
+	if ( text ) {
+	    printf ( "  " );
+	    for ( i=0; i<num; i += 2 ) {
+		emit_c ( bytes[i+1] );
+		emit_c ( bytes[i] );
+	    }
+	}
+	printf ( "\n" );
+    }
+}
+
+/* Look at the entire track and report all of the 0xA1 marks we find
+ * This is useful to determine the number of sectors/track.
+ * Each section should have a header mark and a data mark.
+ */
+void
+mfm_scan_headers ( int cyl, int head, u_short *deltas, int ndeltas )
+{
+    int i;
+
+    /* These are values in units of 200 Mhz clocks.
+     * The value will be 20.0 for a 10 Mhz clock.
+     */
+    float avg_bit_sep_time;
+    float nominal_bit_sep_time;
+
+    int track_time = 0;
+    float clock_time = 0.0;
+    float filter_state = 0;
+
+    // This is the raw MFM data decoded with above
+    u_int raw_word = 0;
+    int bit_pos;
+    int raw_bit_cntr = 0;
+
+    // This is actual data, decoded from the above
+    u_int decoded_word = 0;
+    int decoded_bit_cntr = 0;
+
+#define MAX_BYTES	128
+// dump too many for the header and we miss the data mark
+// #define DUMP_COUNT	40
+// #define DUMP_COUNT	30
+#define DUMP_COUNT_HEADER	24
+#define DUMP_COUNT_DATA		128
+    u_char bytes[MAX_BYTES];
+    int byte_count;
+
+    int mark = 0;
+    int expect;
+
+    enum { SEARCH, DUMP } state;
+    enum { HEADER, DATA } who;
+
+    state = SEARCH;
+    who = HEADER;
+    expect = DUMP_COUNT_HEADER;
+
+    nominal_bit_sep_time = PRU_HZ / CONTROLLER_HZ;
+
+    avg_bit_sep_time = nominal_bit_sep_time;
+    printf ( "Initial bit sep time: %.3f\n", avg_bit_sep_time );
+
+    // printf ( "First deltas: %d %d %d\n", deltas[0], deltas[1], deltas[2] );
+
+    for ( i=1; i< ndeltas; i++ ) {
+	track_time += deltas[i];
+	clock_time += deltas[i];
+
+	for (bit_pos = 0; clock_time > avg_bit_sep_time / 2;
+               clock_time -= avg_bit_sep_time, bit_pos++) ;
+
+	 avg_bit_sep_time = nominal_bit_sep_time + filter(clock_time, &filter_state);
+
+	 /* If the shift is bigger than the word size, then
+	  * it pushes the already accumulated bits entirely out
+	  * of the word.  This would only happen if something
+	  * out of the ordinary was going on.
+	  */
+         if (bit_pos >= sizeof(raw_word)*8) {
+            raw_word = 1;
+         } else {
+            raw_word = (raw_word << bit_pos) | 1;
+         }
+
+         raw_bit_cntr += bit_pos;
+
+	 if ( state == SEARCH ) {
+	     if ((raw_word & 0xffff) == 0x4489) {
+		mark++;
+		// printf ( "Mark (A1) %d at index %d of %d\n", mark, i, ndeltas );
+
+		raw_bit_cntr = 0;
+		decoded_word = 0;
+		decoded_bit_cntr = 0;
+
+		bytes[0] = 0xa1;
+		byte_count = 1;
+
+		state = DUMP;
+	    }
+
+	    /* PORK XXX */
+	 } else {  /* DUMP */
+	    while ( raw_bit_cntr >= 4 ) {
+               u_int tmp;
+               // If we have more than 4 only process 4 this time
+               raw_bit_cntr -= 4;
+               tmp = raw_word >> raw_bit_cntr;
+               decoded_word = (decoded_word << 2) | code_bits[tmp & 0xf];
+               decoded_bit_cntr += 2;
+
+               // If we have a bytes worth store it
+	       // We increment by 2 bits at a time,
+	       // so this will always come out even.
+               if (decoded_bit_cntr >= 8) {
+		  bytes[byte_count++] = decoded_word & 0xff;
+		  decoded_word = 0;
+		  decoded_bit_cntr = 0;
+	       }
+	    }
+	    if ( byte_count >= expect ) {
+		if ( who == HEADER ) {
+		    dump_em ( "header", bytes, byte_count, 0 );
+		    who = DATA;
+		    expect = DUMP_COUNT_DATA;
+		} else {
+		    dump_em ( "data  ", bytes, byte_count, 1 );
+		    who = HEADER;
+		    expect = DUMP_COUNT_HEADER;
+		}
+		state = SEARCH;
+	    }
+	 }
+    }
+
+    printf ( "final filtered bit sep time: %.3f\n", avg_bit_sep_time );
+}
+
+/* -------------------------------------------------------- */
+/* -------------------------------------------------------- */
+/* -------------------------------------------------------- */
+/* -------------------------------------------------------- */
+
+/* Below here is fairly useless, but was highly educational for me.
+ * It was a long day spent chopping things out of David's code
+ * and mashing it into a single file that would actually
+ * compile (not run in any useful way mind you).
+ * It allowed me to learn enough to write the above code,
+ * and I probably won't pursue what follows any further.
+ * Tom Trebisky  5-26-2022
+ */
+
+/* -------------------------------------------------------- */
+/* -------------------------------------------------------- */
+/* -------------------------------------------------------- */
+/* -------------------------------------------------------- */
 /* -------------------------------------------------------- */
 /* MFM decode stuff */
+
+#ifdef SOME_FINE_DAY_MAYBE
 
 // Define states for processing the data.
 // MARK_ID is looking for the 0xa1 byte
@@ -316,9 +532,6 @@ STATE_TYPE;
 #define MAX(x,y) (x > y ? x : y)
 #define MIN(x,y) (x < y ? x : y)
 #define BIT_MASK(x) (1 << (x))
-
-// This converts the MFM clock and data bits into data bits.
-static int code_bits[16] = { 0, 1, 0, 0, 2, 3, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0 };
 
 // This defines all the data in the track. Each operation starts at the
 // end of the previous one.
@@ -1253,5 +1466,6 @@ SECTOR_DECODE_STATUS wd_process_data(STATE_TYPE *state, u_char bytes[],
 
     return sector_status.status;
 }
+#endif /* SOME_FINE_DAY_MAYBE */
 
 /* THE END */
