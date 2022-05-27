@@ -1,13 +1,11 @@
-mfm
+ufs_read
 
-This is my mfm_dump project
+This is a tool to read/extract the contents of the Callan disk image.
 
-I used the David Gesswein MFM emulator to read my Callan Unistar hard drive.
-It has an odd format, so I couldn't immediately read it to a disk image
-as I would have liked to.  But I could certainly read and save the MFM
-transitions file.
+The Callan was an edition 7 unix system running on a Motorola mc68010
+processor.  This means that it is big endian.
+It also means that the disk contains two "old style"
+unix file systems.
 
-Now my job is to learn enough to concoct a custom format for the drive.
-In order to learn enough to do that, I decided to study his code and
-write this "track dumper" that reads data for a single track from
-the transitions file and dumps it in a format that I can understand.
+This program negotiates the unix file system, copying the file
+structure to a directory on a linux system.

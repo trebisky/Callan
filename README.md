@@ -20,3 +20,4 @@ remote "stub" protocol.
 -- uart - improved serial IO for interaction with python script
 -- hd3 - hopefully the final hd driver and contents extraction
 -- mfm - the mfm_dump tool to dump tracks from a Gesswein transitions file
+-- ufs_read - tool to read/extract files the the callan disk image

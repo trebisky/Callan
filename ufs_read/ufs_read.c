@@ -33,6 +33,38 @@
  *  encounters, and when it finds the contents already have been
  *  copied, it will make the symbolic link.  This means that the
  *  first link encountered will become the "hard name".
+ *
+ * -----------------------------------------------
+ *
+ * The Callan disk was a Rodime 204 (nominal 20M capacity) MFM drive.
+ * It had 320 cylinders and 8 heads.
+ * It had 512 byte sectors, 17 of them per track.
+ * We will call 512 byte sectors "blocks" in the program.
+ *
+ * So a cylinder has 8*17 blocks = 136 blocks per cylinder.
+ * So the disk has 320*136 blocks = 43520 blocks per disk.
+ *
+ * The disk image is 22282240 bytes.
+ * This is 43520 blocks, which is just right.
+ * However, there was trouble reading the disk beyond cylinder 305.
+ * So we could consider that we have 306 good cylinders of data.
+ * So good data extends to block 41616 (more or less)
+ * Any files that reside in blocks beyond this will need to be
+ * considered as suspect.
+ *
+ * ------------------------
+ *
+ * Back in those days, disks did not contain partition tables.
+ * A partition table was compiled into each disk driver.
+ * By good fortune, I have a folder with notes about this system.
+ * And my notes include information about the partitions,
+ * as follows:
+ *
+ *  Blocks 0-135	bblk		  1 cylinder, 136 blocks
+ *  Blocks 136-12511	partition "a"	 91 cylinders, 12376 blocks
+ *  Blocks 12512-17407  swap		 36 cylinders, 4896 blocks
+ *  Blocks 17408-43519  partition "b"	192 cylinders, 26112 blocks
+ *
  */
 
 #include <stdio.h>
