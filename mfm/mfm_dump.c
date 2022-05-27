@@ -1,5 +1,8 @@
 /* mfm_dump.c
  *
+ * This is a program to read an MFM disk transitions file written by
+ * the David Gesswein MFM disk emulator/analyzer.
+ *
  * Tom Trebisky  5-25-2022
  */
 
@@ -15,19 +18,33 @@ typedef unsigned short u_short;
 typedef unsigned int u_int;
 typedef unsigned long u_int64;
 
-/* Edit the following to specify your file and track
+/* Defaults - edit or override via the command line.
  */
 char * tran_path = "callan_raw1";
-//#define MY_CYL	100
-#define MY_CYL	180
-#define MY_HEAD	3
+
+int my_cyl = 180;
+int my_head = 3;
+
+char * out_path = "disk.img";
+
+enum { SCAN, DUMP, EXTRACT } option = EXTRACT;
+
+int data_dump_len = 128;
+
+/* Beyond cylinder 305 my disk is all messed up.
+ * The transitions file has data all the way through
+ * cylinder 320, but it just causes trouble to try to
+ * do anything with it.
+ */
+#define CYLINDER_LIMIT	305
 
 /* ------------------------------ */
 
 void tran_read_all ( char * );
 void tran_read_deltas ( char *, int, int, u_short *, int * );
-void mfm_scan_marks ( int, int, u_short *, int );
-void mfm_scan_headers ( int, int, u_short *, int );
+void mfm_extract_image ( char * );
+void mfm_scan_marks ( u_short *, int );
+void mfm_scan_headers ( u_short *, int );
 
 // void mfm_decode_deltas ( int, int, u_short *, int );
 
@@ -74,19 +91,91 @@ error ( char *msg )
     exit ( 1 );
 }
 
+void
+handle_args ( int argc, char **argv )
+{
+	char *p;
+
+	argc--;
+	argv++;
+
+	/* First argument (if any) is the input file */
+	if ( argc ) {
+	    tran_path = argv[0];
+	    --argc;
+	    ++argv;
+	}
+
+	while ( argc ) {
+	    p = *argv;
+	    if ( *p != '-' ) {
+		/* skip anything not begining with '-' */
+		argc--;
+		argv++;
+		continue;
+	    }
+	    ++p;
+	    if ( *p == 'o' ) {
+		out_path = argv[1];
+		argc -= 2;
+		argv += 2;
+	    }
+	    if ( *p == 'h' ) {
+		my_head = atoi ( argv[1] );
+		argc -= 2;
+		argv += 2;
+	    }
+	    if ( *p == 'c' ) {
+		my_cyl = atoi ( argv[1] );
+		argc -= 2;
+		argv += 2;
+	    }
+	    if ( *p == 'l' ) {
+		data_dump_len = atoi ( argv[1] );
+		argc -= 2;
+		argv += 2;
+	    }
+
+	    if ( *p == 's' ) {
+		option = SCAN;
+		argc--;
+		argv++;
+	    }
+	    if ( *p == 'd' ) {
+		option = DUMP;
+		argc--;
+		argv++;
+	    }
+	    if ( *p == 'e' ) {
+		option = EXTRACT;
+		argc--;
+		argv++;
+	    }
+	}
+}
+
 int
 main ( int argc, char **argv )
 {
+    handle_args ( argc, argv );
+
     // tran_read_all ( tran_path );
-    tran_read_deltas ( tran_path, MY_CYL, MY_HEAD, deltas, &ndeltas );
+
+    if ( option == EXTRACT) {
+	mfm_extract_image ( tran_path );
+	return 0;
+    }
+
+    tran_read_deltas ( tran_path, my_cyl, my_head, deltas, &ndeltas );
 
     // forget about this.
-    // mfm_decode_deltas ( MY_CYL, MY_HEAD, deltas, ndeltas );
+    // mfm_decode_deltas ( my_cyl, my_head, deltas, ndeltas );
 
-    /* Uncomment one of these according to what you want to do.
-     */
-    // mfm_scan_marks ( MY_CYL, MY_HEAD, deltas, ndeltas );
-    mfm_scan_headers ( MY_CYL, MY_HEAD, deltas, ndeltas );
+    if ( option == SCAN )
+	mfm_scan_marks ( deltas, ndeltas );
+
+    if ( option == DUMP )
+	mfm_scan_headers ( deltas, ndeltas );
 
     return 0;
 }
@@ -104,6 +193,8 @@ tran_read_all ( char *path )
     off_t pos;
 
     fd = open ( path, O_RDONLY );
+    if ( fd < 0 )
+	error ( "cannot open input file" );
 
     read ( fd, &hdr, sizeof(hdr) );
     if ( memcmp ( hdr.id, valid_id, sizeof(hdr.id) ) != 0 )
@@ -160,7 +251,7 @@ unpack_deltas ( u_char *raw, int nraw, u_short *deltas, int *count )
 	    error ( "Too many deltas" );
          deltas[ndx++] = value;
       }
-     printf ( "Unpacked %d deltas\n", ndx );
+     // printf ( "Unpacked %d deltas\n", ndx );
      *count = ndx;
 }
 
@@ -174,6 +265,8 @@ tran_read_deltas ( char *path, int cyl, int head, u_short *deltas, int *ndeltas 
     off_t pos;
 
     fd = open ( path, O_RDONLY );
+    if ( fd < 0 )
+	error ( "cannot open input file" );
 
     read ( fd, &hdr, sizeof(hdr) );
     if ( memcmp ( hdr.id, valid_id, sizeof(hdr.id) ) != 0 )
@@ -196,7 +289,7 @@ tran_read_deltas ( char *path, int cyl, int head, u_short *deltas, int *ndeltas 
 	if ( track_hdr.cyl != cyl ||  track_hdr.head != head )
 	    continue;
 
-	printf ( "Track for %d:%d -- %d bytes\n", track_hdr.cyl, track_hdr.head, track_hdr.size );
+	// printf ( "Track for %d:%d -- %d bytes\n", track_hdr.cyl, track_hdr.head, track_hdr.size );
 	read ( fd, raw_deltas, track_hdr.size );
 	unpack_deltas ( raw_deltas, track_hdr.size, deltas, ndeltas );
 	return;
@@ -205,6 +298,50 @@ tran_read_deltas ( char *path, int cyl, int head, u_short *deltas, int *ndeltas 
     close ( fd );
 
     error ( "Did not find requested track" );
+}
+
+typedef void (*tfptr) ( u_short *, int  );
+
+/* Loop through entire file,
+ * call given function to process each track.
+ */
+void
+tran_loop_iter ( char *path, tfptr func )
+{
+    struct tran_header hdr;
+    struct track_header track_hdr;
+    int fd;
+    int n;
+    off_t pos;
+
+    fd = open ( path, O_RDONLY );
+    if ( fd < 0 )
+	error ( "cannot open input file" );
+
+    read ( fd, &hdr, sizeof(hdr) );
+    if ( memcmp ( hdr.id, valid_id, sizeof(hdr.id) ) != 0 )
+	error ( "Bad file header" );
+
+    pos = hdr.fh_size;
+
+    for ( ;; ) {
+	lseek ( fd, pos, SEEK_SET );
+	n = read ( fd, &track_hdr, sizeof(track_hdr) );
+	if ( n <= 0 )
+	    break;
+	if ( track_hdr.cyl == -1 &&  track_hdr.head == -1 )
+	    break;
+	if ( track_hdr.cyl > CYLINDER_LIMIT )
+	    break;
+	// printf ( "Track for %d:%d -- %d bytes\n", track_hdr.cyl, track_hdr.head, track_hdr.size );
+	pos += track_hdr.size + sizeof(track_hdr) + 4;
+
+	read ( fd, raw_deltas, track_hdr.size );
+	unpack_deltas ( raw_deltas, track_hdr.size, deltas, &ndeltas );
+	(*func) ( deltas, ndeltas );
+    }
+
+    close ( fd );
 }
 
 /* -------------------------------------------------------- */
@@ -220,7 +357,6 @@ tran_read_deltas ( char *path, int cyl, int head, u_short *deltas, int *ndeltas 
  * them to index this table.  This gives us 2 bits of actual data.
  */
 static int code_bits[16] = { 0, 1, 0, 0, 2, 3, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0 };
-
 
 // Type II PLL. Here so it will inline. Converted from continuous time
 // by bilinear transformation. Coefficients adjusted to work best with
@@ -241,7 +377,7 @@ filter(float v, float *delay)
  * Each section should have a header mark and a data mark.
  */
 void
-mfm_scan_marks ( int cyl, int head, u_short *deltas, int ndeltas )
+mfm_scan_marks ( u_short *deltas, int ndeltas )
 {
     int i;
     int bit_pos;
@@ -355,7 +491,7 @@ dump_em ( char *msg, u_char *bytes, int num, int text )
  * Each section should have a header mark and a data mark.
  */
 void
-mfm_scan_headers ( int cyl, int head, u_short *deltas, int ndeltas )
+mfm_scan_headers ( u_short *deltas, int ndeltas )
 {
     int i;
 
@@ -383,7 +519,6 @@ mfm_scan_headers ( int cyl, int head, u_short *deltas, int ndeltas )
 // #define DUMP_COUNT	40
 // #define DUMP_COUNT	30
 #define DUMP_COUNT_HEADER	24
-#define DUMP_COUNT_DATA		128
     u_char bytes[MAX_BYTES];
     int byte_count;
 
@@ -464,7 +599,7 @@ mfm_scan_headers ( int cyl, int head, u_short *deltas, int ndeltas )
 		if ( who == HEADER ) {
 		    dump_em ( "header", bytes, byte_count, 0 );
 		    who = DATA;
-		    expect = DUMP_COUNT_DATA;
+		    expect = data_dump_len;
 		} else {
 		    dump_em ( "data  ", bytes, byte_count, 1 );
 		    who = HEADER;
@@ -476,6 +611,155 @@ mfm_scan_headers ( int cyl, int head, u_short *deltas, int ndeltas )
     }
 
     printf ( "final filtered bit sep time: %.3f\n", avg_bit_sep_time );
+}
+
+/* This will be used to actually extract data from the disk.
+ */
+void
+mfm_process_track ( u_short *deltas, int ndeltas )
+{
+    // printf ( "P track - %d\n", ndeltas );
+
+    /* These are values in units of 200 Mhz clocks.
+     * The value will be 20.0 for a 10 Mhz clock.
+     */
+    float avg_bit_sep_time;
+    float nominal_bit_sep_time;
+
+    int track_time = 0;
+    float clock_time = 0.0;
+    float filter_state = 0;
+
+    // This is the raw MFM data decoded with above
+    u_int raw_word = 0;
+    int bit_pos;
+    int raw_bit_cntr = 0;
+
+    // This is actual data, decoded from the above
+    u_int decoded_word = 0;
+    int decoded_bit_cntr = 0;
+
+#define MAX_BYTES	128
+// dump too many for the header and we miss the data mark
+// #define DUMP_COUNT	40
+// #define DUMP_COUNT	30
+#define DUMP_COUNT_HEADER	24
+// #define DUMP_COUNT_DATA		128
+    u_char bytes[MAX_BYTES];
+    int byte_count;
+
+    int mark = 0;
+    int expect;
+
+    enum { SEARCH, DUMP } state;
+    enum { HEADER, DATA } who;
+
+    int i;
+    int nsec = 0;
+    int first = 1;
+
+    int cyl;
+    int head;
+    int sector;
+
+    /* ---------------- */
+
+    state = SEARCH;
+    who = HEADER;
+    expect = DUMP_COUNT_HEADER;
+
+    nominal_bit_sep_time = PRU_HZ / CONTROLLER_HZ;
+
+    avg_bit_sep_time = nominal_bit_sep_time;
+    // printf ( "Initial bit sep time: %.3f\n", avg_bit_sep_time );
+
+    // printf ( "First deltas: %d %d %d\n", deltas[0], deltas[1], deltas[2] );
+
+    for ( i=1; i< ndeltas; i++ ) {
+	track_time += deltas[i];
+	clock_time += deltas[i];
+
+	for (bit_pos = 0; clock_time > avg_bit_sep_time / 2;
+               clock_time -= avg_bit_sep_time, bit_pos++) ;
+
+	 avg_bit_sep_time = nominal_bit_sep_time + filter(clock_time, &filter_state);
+
+	 /* If the shift is bigger than the word size, then
+	  * it pushes the already accumulated bits entirely out
+	  * of the word.  This would only happen if something
+	  * out of the ordinary was going on.
+	  */
+         if (bit_pos >= sizeof(raw_word)*8) {
+            raw_word = 1;
+         } else {
+            raw_word = (raw_word << bit_pos) | 1;
+         }
+
+         raw_bit_cntr += bit_pos;
+
+	 if ( state == SEARCH ) {
+	     if ((raw_word & 0xffff) == 0x4489) {
+		mark++;
+		// printf ( "Mark (A1) %d at index %d of %d\n", mark, i, ndeltas );
+
+		raw_bit_cntr = 0;
+		decoded_word = 0;
+		decoded_bit_cntr = 0;
+
+		bytes[0] = 0xa1;
+		byte_count = 1;
+
+		state = DUMP;
+	    }
+
+	    /* PORK XXX */
+	 } else {  /* DUMP */
+	    while ( raw_bit_cntr >= 4 ) {
+               u_int tmp;
+               // If we have more than 4 only process 4 this time
+               raw_bit_cntr -= 4;
+               tmp = raw_word >> raw_bit_cntr;
+               decoded_word = (decoded_word << 2) | code_bits[tmp & 0xf];
+               decoded_bit_cntr += 2;
+
+               // If we have a bytes worth store it
+	       // We increment by 2 bits at a time,
+	       // so this will always come out even.
+               if (decoded_bit_cntr >= 8) {
+		  bytes[byte_count++] = decoded_word & 0xff;
+		  decoded_word = 0;
+		  decoded_bit_cntr = 0;
+	       }
+	    }
+	    if ( byte_count >= expect ) {
+		if ( who == HEADER ) {
+		    cyl = bytes[2] | ((bytes[3]&0xf0)<<4);
+		    head = bytes[3] & 0xf;
+		    if ( bytes[1] != 0xfe )
+			printf ( "Funky header for CH = %d %d\n", cyl, head );
+		    sector = bytes[4];
+		    // dump_em ( "header", bytes, byte_count, 0 );
+		    who = DATA;
+		    expect = data_dump_len;
+		} else {
+		    nsec++;
+		    // dump_em ( "data  ", bytes, byte_count, 1 );
+		    who = HEADER;
+		    expect = DUMP_COUNT_HEADER;
+		}
+		state = SEARCH;
+	    }
+	 }
+    }
+
+    // printf ( "final filtered bit sep time: %.3f\n", avg_bit_sep_time );
+    printf ( "CH = %4d %d -- %d sectors\n", cyl, head, nsec );
+}
+
+void
+mfm_extract_image ( char *path )
+{
+    tran_loop_iter ( path, mfm_process_track );
 }
 
 /* -------------------------------------------------------- */
