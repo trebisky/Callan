@@ -105,7 +105,8 @@ main ( int argc, char **argv )
     if ( disk_fd < 0 )
 	error ( "could not open disk image" );
 
-    dump_fs ( OFFSET_A, SIZE_A );
+    // dump_fs ( OFFSET_A, SIZE_A );
+    dump_fs ( OFFSET_B, SIZE_B );
 
     return 0;
 }
@@ -621,13 +622,14 @@ get_dir_entry ( struct mem_direct *dp, struct mem_inode *mp, int entry )
  */
 
 void
-walk_dir ( int inode )
+walk_dir ( int inode, char *path )
 {
     struct mem_inode m_inode;
     struct mem_inode entry_inode;
     struct mem_direct m_dir;
     int entry;
     int code;
+    char new_path[256];
 
     // printf ( "Start walk for inode %d\n", inode );
 
@@ -668,8 +670,11 @@ walk_dir ( int inode )
 
 	get_inode ( &entry_inode, m_dir.inode );
 	if ( (entry_inode.mode & IFMT) == IFDIR ) {
-	    printf ( "Enter: %s\n", m_dir.name );
-	    walk_dir ( m_dir.inode );
+	    strcpy ( new_path, path );
+	    strcat ( new_path, "/" );
+	    strcat ( new_path, m_dir.name );
+	    printf ( "Enter: %s\n", new_path );
+	    walk_dir ( m_dir.inode, new_path );
 	}
     }
 
@@ -681,7 +686,7 @@ walk_dir ( int inode )
 void
 walk_it ( void )
 {
-    walk_dir ( ROOT_INO );
+    walk_dir ( ROOT_INO, "." );
 }
 
 void
