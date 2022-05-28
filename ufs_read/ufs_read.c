@@ -465,14 +465,6 @@ struct mem_inode
         time_t  ctime;       /* time created */
 };
 
-#ifdef notdef
-        unsigned short  di_mode;        /* mode and type of file */
-        short   di_nlink;       /* number of links to file */
-        short   di_uid;         /* owner's user id */
-        short   di_gid;         /* owner's group id */
-        xoff_t   di_size;        /* number of bytes in file */
-#endif
-
 void
 fix_inode ( struct mem_inode *mp, struct dinode *dp )
 {
@@ -489,6 +481,10 @@ fix_inode ( struct mem_inode *mp, struct dinode *dp )
 	mp->mtime = dp->di_mtime;
 	mp->ctime = dp->di_ctime;
 
+	/* XXX - this needs to be enhanced to deal with
+	 * indirect blocks, expanding them into a linear list
+	 * to make my life easy and convenient.
+	 */
 	j = 0;
 	for ( i=0; i<BYTES_INODE_ADDR; i += 3 ) {
 	    u = &dp->di_addr[i];
@@ -585,7 +581,14 @@ get_dir_entry ( struct mem_direct *dp, struct mem_inode *mp, int entry )
     if ( bindex >= 10 )
 	error ( "whoaa -- dir needs an indirect block" );
 
-    if ( !mp->addr[bindex] )
+    /* We are done when we hit a zero block pointer.
+     * (or when we run out of block pointers).
+     * See above for running out of block pointers
+     * XXX - someday we may have a big list due to
+     * indirect blocks and will need to know how big
+     * that list is.
+     */
+    if ( ! mp->addr[bindex] )
 	return 0;
 
     // printf ( "Read block %d (%d) for directory entries\n", mp->addr[bindex], bindex );
@@ -594,9 +597,16 @@ get_dir_entry ( struct mem_direct *dp, struct mem_inode *mp, int entry )
     dbp = (struct direct *) dir_block;
     fix_direct ( dp, &dbp[index] );
 
-    /* stop on zero inode */
+#ifdef WRONG
+    /* It is wrong to stop on the first zero inode.
+     * The unlink call simply clears the inode value
+     * in the directory and valid entries may follow.
+     * So we should return the zero entries and the
+     * caller must ignore them.
+     */
     if ( ! dp->inode )
 	return 0;
+#endif
 
     return 1;
 }
@@ -619,44 +629,41 @@ walk_dir ( int inode )
     int entry;
     int code;
 
-    printf ( "Start walk for inode %d\n", inode );
+    // printf ( "Start walk for inode %d\n", inode );
+
     // show_inode ( inode );
     get_inode ( &m_inode, inode );
-
-    // exit ( 1 );
 
     if ( (m_inode.mode & IFMT) != IFDIR )
 	error ( "oops - not a directory" );
 
     /* First pass, list full contents */
-    entry = 0;
-    while ( get_dir_entry ( &m_dir, &m_inode, entry ) ) {
-	if ( m_dir.inode ) {
-	    // printf ( "Fetch inode %d for %s\n", m_dir.inode, m_dir.name );
-	    // show_inode ( m_dir.inode );
-	    get_inode ( &entry_inode, m_dir.inode );
+    for ( entry = 0; get_dir_entry ( &m_dir, &m_inode, entry ); entry++ ) {
+	if ( ! m_dir.inode )
+	    continue;
 
-	    // printf ( "mem inode mode = %08x\n", entry_inode.mode );
-	    code = ((entry_inode.mode & IFMT) == IFDIR) ? 'D' : 'R';
+	// printf ( "Fetch inode %d for %s\n", m_dir.inode, m_dir.name );
+	// show_inode ( m_dir.inode );
+	get_inode ( &entry_inode, m_dir.inode );
 
-	    printf ( "%5d %c (%d %d) %s\n", m_dir.inode, code,
-		entry_inode.nlink, entry_inode.size, m_dir.name );
-	} else {
-	    /* should not happen, should no be given these */
-	    printf ( "Zero entry: %5d %s\n", m_dir.inode, m_dir.name );
-	}
-	entry ++;
+	// printf ( "mem inode mode = %08x\n", entry_inode.mode );
+	code = ((entry_inode.mode & IFMT) == IFDIR) ? 'D' : 'R';
+
+	printf ( "%5d %c (%d %d) %s\n", m_dir.inode, code,
+	    entry_inode.nlink, entry_inode.size, m_dir.name );
     }
 
-    printf ( "Start walk pass 2 for inode %d\n", inode );
+    // printf ( "Start walk pass 2 for inode %d\n", inode );
+
     /* Second pass, recurse into subdirectories.
      * Avoid "." and ".."
      */
-    entry = 0;
     for ( entry = 0; get_dir_entry ( &m_dir, &m_inode, entry ); entry++ ) {
-	if ( ! m_dir.inode ||
-	    strcmp ( m_dir.name, "." ) == 0 ||
-	    strcmp ( m_dir.name, ".." ) == 0 )
+	if ( ! m_dir.inode )
+	    continue;
+	if ( strcmp ( m_dir.name, "." ) == 0 )
+	    continue;
+	if ( strcmp ( m_dir.name, ".." ) == 0 )
 		continue;
 
 	get_inode ( &entry_inode, m_dir.inode );
@@ -666,7 +673,7 @@ walk_dir ( int inode )
 	}
     }
 
-    printf ( "Walk done for inode %d\n", inode );
+    // printf ( "Walk done for inode %d\n", inode );
 }
 
 /* Start at the root and this should recurse through the entire filesystem
