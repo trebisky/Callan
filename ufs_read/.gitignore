@@ -1,3 +1,5 @@
 ufs_read
 *.o
 callan.img
+*.img
+*.odx

@@ -12,3 +12,12 @@ test:
 
 clean:
 	rm -f *.o ufs_read
+
+# -------------------------------------
+
+parta:
+	dd if=callan.img of=parta.img bs=512 skip=136 count=12376
+
+partb:
+	dd if=callan.img of=partb.img bs=512 skip=17408
+

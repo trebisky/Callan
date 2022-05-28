@@ -72,6 +72,8 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include <fcntl.h>
+#include <string.h>
+#include <time.h>
 
 //#include <endian.h>
 #include <arpa/inet.h>
@@ -161,6 +163,7 @@ block_show ( int block )
 {
     u_char buf[BSIZE];
 
+    printf ( "Block %d ------------ -----------\n", block );
     disk_read ( buf, block );
     block_dump ( buf, BSIZE );
 }
@@ -168,10 +171,11 @@ block_show ( int block )
 /* ----------------------------- */
 
 /* From:
- *  sys/filsys.h
- *  sys/param.h
- *  sys/types.h
- *  sys/ino.h
+ *  include/sys/filsys.h
+ *  include/sys/param.h
+ *  include/sys/types.h
+ *  include/sys/ino.h
+
  */
 
 /* ino_t conflicts with linux headers */
@@ -179,10 +183,16 @@ typedef	unsigned short	xino_t;     	/* i-node number */
 typedef	unsigned int	xoff_t;
 typedef	unsigned int	xtime_t;
 
+/* These are in core "caches" not relevant to us.
+ * but they do take up space in the super block
+ */
 #define NICFREE 50
 #define NICINOD 100             /* number of superblock inodes */
 
-#define ROOTINO ((xino_t)1)
+/* Don't ask me what inode 1 is for.
+ * No doubt 0 is reserved for "nobody home here"
+ */
+#define ROOT_INO	2
 
 /* Note that in these ancient days, the super block had no magic number.
  * You just had to know where it was.
@@ -195,6 +205,8 @@ struct __attribute__((__packed__)) super
     u_int	free[NICFREE];
     u_short	ninode;
     xino_t	inode[NICINOD];
+    u_int	stuff;
+    xtime_t	time;
     char	_extra[512];
 };
 
@@ -212,6 +224,8 @@ struct __attribute__((__packed__)) dinode
         xtime_t  di_mtime;       /* time last modified */
         xtime_t  di_ctime;       /* time created */
 };
+
+#define INODES_PER_BLOCK	(BSIZE / sizeof (struct dinode))
 
 /* We get 13 addresses of 3 bytes each (and an extra byte) */
 
@@ -232,13 +246,16 @@ struct __attribute__((__packed__)) dinode
 #define IWRITE  0200
 #define IEXEC   0100
 
+struct dinode iblock[INODES_PER_BLOCK];
 
-#define NIBLOCK	8
-struct dinode iblock[NIBLOCK];
+/* I nodes begin at block 2 in the filesystem.
+ */
+#define INODE_OFFSET	2
 
 struct super sb;
 
 /* These were the days!  14 byte filename limits.
+ *  note that there is no guarantee of a null terminator.
  * So directory entries were 16 bytes
  *  and you could get 32 of them in a block
  */
@@ -249,6 +266,9 @@ struct  direct
         char    d_name[DIRSIZ];
 };
 
+#define DIRECT_PER_BLOCK	(BSIZE / sizeof(struct direct))
+
+/* These two work in place */
 
 void
 ifix ( u_int *val )
@@ -266,6 +286,20 @@ sfix ( u_short *val )
 
     tmp = *val;
     *val = htons ( tmp );
+}
+
+/* These two return the fixed value */
+
+int
+f_ifix ( u_int val )
+{
+    return htonl ( val );
+}
+
+int
+f_sfix ( u_short val )
+{
+    return htons ( val );
 }
 
 void
@@ -299,7 +333,7 @@ dump_iblock ( int block )
     int i;
 
     disk_read ( (u_char *) iblock, block );
-    for ( i=0; i<NIBLOCK; i++ ) {
+    for ( i=0; i<INODES_PER_BLOCK; i++ ) {
 	printf ( "I-node %d\n", i );
 	dump_inode ( &iblock[i] );
     }
@@ -352,9 +386,29 @@ dump_root ( void )
 }
 
 void
+encode_time ( char *str, xtime_t tt )
+{
+    // time_t current_time;
+    struct tm * time_info;
+    // char timeString[9];  // space for "HH:MM:SS\0"
+    time_t big_time;
+
+    // time(&current_time);
+    // time_info = localtime(&current_time);
+
+    big_time = tt;
+    time_info = localtime(&big_time);
+
+    // strftime(timeString, sizeof(timeString), "%H:%M:%S", time_info);
+    strftime ( str, 32, "%x %H:%M:%S", time_info);
+    // puts(timeString);
+}
+
+void
 read_super ( void )
 {
     int tmp;
+    char time_str[32];
 
     // block 0 was called the "boot block".
     // This was not used on the Callan, and I find
@@ -368,13 +422,259 @@ read_super ( void )
     ifix ( &sb.fsize );
     sfix ( &sb.nfree );
     sfix ( &sb.ninode );
+    ifix ( &sb.time );
+    encode_time ( time_str, sb.time );
 
     printf ( "\n" );
+    printf ( "Filesystem isize: %d\n", sb.isize );	/* in blocks */
     printf ( "Filesystem size: %d\n", sb.fsize );
     printf ( "Filesystem nfree: %d\n", sb.nfree );
     printf ( "Filesystem ninode: %d\n", sb.ninode );
+    printf ( "Filesystem time: %d %s\n", sb.time, time_str );
     printf ( "\n" );
     printf ( "Filesystem inode size: %d\n", sizeof(struct dinode) );
+}
+
+void
+dump_it ( void )
+{
+    /* Block 2 is the start of inodes */
+    block_show ( 2 );
+    // dump_iblock ( 2 );
+    dump_root ();
+}
+
+/* ------------------------------------------------------- */
+/* ------------------------------------------------------- */
+/* ------------------------------------------------------- */
+
+/* The only disk inode stores disk addresses in 3 bytes */
+#define NUM_INODE_ADDR		13
+#define BYTES_INODE_ADDR	(NUM_INODE_ADDR * 3)
+
+struct mem_inode
+{
+        int   mode;        /* mode and type of file */
+        int   nlink;       /* number of links to file */
+        int   uid;         /* owner's user id */
+        int   gid;         /* owner's group id */
+        int   size;        /* number of bytes in file */
+        u_int   addr[NUM_INODE_ADDR];    /* disk block addresses */
+        time_t  atime;       /* time last accessed */
+        time_t  mtime;       /* time last modified */
+        time_t  ctime;       /* time created */
+};
+
+#ifdef notdef
+        unsigned short  di_mode;        /* mode and type of file */
+        short   di_nlink;       /* number of links to file */
+        short   di_uid;         /* owner's user id */
+        short   di_gid;         /* owner's group id */
+        xoff_t   di_size;        /* number of bytes in file */
+#endif
+
+void
+fix_inode ( struct mem_inode *mp, struct dinode *dp )
+{
+	int i, j;
+	u_char *u;
+
+	mp->mode = f_sfix ( dp->di_mode );
+	mp->nlink = f_sfix ( dp->di_nlink );
+	mp->uid = f_sfix ( dp->di_uid );
+	mp->gid = f_sfix ( dp->di_gid );
+	mp->size = f_ifix ( dp->di_size );
+
+	mp->atime = dp->di_atime;
+	mp->mtime = dp->di_mtime;
+	mp->ctime = dp->di_ctime;
+
+	j = 0;
+	for ( i=0; i<BYTES_INODE_ADDR; i += 3 ) {
+	    u = &dp->di_addr[i];
+	    mp->addr[j++] = u[0]<<16 | u[1]<<8 | u[2];
+	}
+}
+
+/* A close brother to get_inode, which follows.
+ */
+void
+show_inode ( int inode )
+{
+    int block;
+    int index;
+    u_char buf[BSIZE];
+    struct mem_inode mi;
+    struct dinode *dp;
+    int addr;
+    int i;
+
+    block = INODE_OFFSET + (inode-1) / INODES_PER_BLOCK;
+    index = (inode-1) % INODES_PER_BLOCK;
+
+    printf ( "Show inode %d -- block %d, index %d\n", inode, block, index );
+    // block_show ( block );
+
+    disk_read ( buf, block );
+    dp = (struct dinode *) buf;
+    block_dump ( (u_char *) &dp[index], sizeof(struct dinode) );
+
+    fix_inode ( &mi, &dp[index] );
+    for ( i=0; i<NUM_INODE_ADDR; i++ ) {
+	addr = mi.addr[i];
+	// if ( addr )
+	    printf ( "Addr: %d = %d\n", i, addr );
+    }
+}
+
+void
+get_inode ( struct mem_inode *mp, int inode )
+{
+    int block;
+    int index;
+
+    /* It is surprising, but indeed, inode 0 is not stored in the list.
+     * So this subtraction is essential.
+     */
+    block = INODE_OFFSET + (inode-1) / INODES_PER_BLOCK;
+    index = (inode-1) % INODES_PER_BLOCK;
+
+    // printf ( "Fetching inode %d -- block %d, index %d\n", inode, block, index );
+    // block_show ( block );
+
+    disk_read ( (u_char *) iblock, block );
+    fix_inode ( mp, &iblock[index] );
+
+    // printf ( "IPB = %d\n", INODES_PER_BLOCK );
+}
+
+struct mem_direct {
+    int		inode;
+    char	name[16];
+};
+
+void
+fix_direct ( struct mem_direct *dp, struct direct *diskp )
+{
+	dp->inode = f_sfix ( diskp->d_ino );
+	strncpy ( dp->name, diskp->d_name, 14 );
+	dp->name[14] = 0;
+}
+
+/* This stops on the first entry with a zero i-node,
+ * which I think (hope) is correct.
+ * dp - the directory entry that is fetched.
+ * mp - the inode of the directory being scanned.
+ * entry - the index of the directory entry that is wanted.
+ *
+ * This does read a disk block for every directory entry.
+ *  It is a sad world sometimes.
+ */
+int
+get_dir_entry ( struct mem_direct *dp, struct mem_inode *mp, int entry )
+{
+    int index;
+    int bindex;
+    u_char dir_block[BSIZE];
+    struct direct *dbp;
+
+    index = entry % DIRECT_PER_BLOCK;
+    bindex = entry / DIRECT_PER_BLOCK;
+    // printf ( "index %d of %d\n", index, DIRECT_PER_BLOCK );
+
+    if ( bindex >= 10 )
+	error ( "whoaa -- dir needs an indirect block" );
+
+    if ( !mp->addr[bindex] )
+	return 0;
+
+    // printf ( "Read block %d (%d) for directory entries\n", mp->addr[bindex], bindex );
+
+    disk_read ( dir_block, mp->addr[bindex] );
+    dbp = (struct direct *) dir_block;
+    fix_direct ( dp, &dbp[index] );
+
+    /* stop on zero inode */
+    if ( ! dp->inode )
+	return 0;
+
+    return 1;
+}
+
+/* Inode 1 looks like this (whatever it is)
+00000400 8000 0000 0000 0000 0000 0000 0000 0000 0000 0000 0000 0000 0000 0000 0000 0000
+00000420 0000 0000 0000 0000 0000 0000 0000 0000 0000 0000 18d3 f718 18d3 f718 18d3 f718
+
+ * and Inode 2 (the root directory)
+00000440 41ff 000d 0000 0000 0000 0210 0001 f100 2470 0000 0000 0000 0000 0000 0000 0000
+00000460 0000 0000 0000 0000 0000 0000 0000 0000 0000 0000 2763 1c52 2753 223c 2753 223c
+ */
+
+void
+walk_dir ( int inode )
+{
+    struct mem_inode m_inode;
+    struct mem_inode entry_inode;
+    struct mem_direct m_dir;
+    int entry;
+    int code;
+
+    printf ( "Start walk for inode %d\n", inode );
+    // show_inode ( inode );
+    get_inode ( &m_inode, inode );
+
+    // exit ( 1 );
+
+    if ( (m_inode.mode & IFMT) != IFDIR )
+	error ( "oops - not a directory" );
+
+    /* First pass, list full contents */
+    entry = 0;
+    while ( get_dir_entry ( &m_dir, &m_inode, entry ) ) {
+	if ( m_dir.inode ) {
+	    // printf ( "Fetch inode %d for %s\n", m_dir.inode, m_dir.name );
+	    // show_inode ( m_dir.inode );
+	    get_inode ( &entry_inode, m_dir.inode );
+
+	    // printf ( "mem inode mode = %08x\n", entry_inode.mode );
+	    code = ((entry_inode.mode & IFMT) == IFDIR) ? 'D' : 'R';
+
+	    printf ( "%5d %c (%d %d) %s\n", m_dir.inode, code,
+		entry_inode.nlink, entry_inode.size, m_dir.name );
+	} else {
+	    /* should not happen, should no be given these */
+	    printf ( "Zero entry: %5d %s\n", m_dir.inode, m_dir.name );
+	}
+	entry ++;
+    }
+
+    printf ( "Start walk pass 2 for inode %d\n", inode );
+    /* Second pass, recurse into subdirectories.
+     * Avoid "." and ".."
+     */
+    entry = 0;
+    for ( entry = 0; get_dir_entry ( &m_dir, &m_inode, entry ); entry++ ) {
+	if ( ! m_dir.inode ||
+	    strcmp ( m_dir.name, "." ) == 0 ||
+	    strcmp ( m_dir.name, ".." ) == 0 )
+		continue;
+
+	get_inode ( &entry_inode, m_dir.inode );
+	if ( (entry_inode.mode & IFMT) == IFDIR ) {
+	    printf ( "Enter: %s\n", m_dir.name );
+	    walk_dir ( m_dir.inode );
+	}
+    }
+
+    printf ( "Walk done for inode %d\n", inode );
+}
+
+/* Start at the root and this should recurse through the entire filesystem
+ */
+void
+walk_it ( void )
+{
+    walk_dir ( ROOT_INO );
 }
 
 void
@@ -382,9 +682,8 @@ dump_fs ( int offset, int size )
 {
     disk_offset ( offset, size );
     read_super ();
-    block_show ( 2 );
-    // dump_iblock ( 2 );
-    dump_root ();
+    // dump_it ();
+    walk_it ();
 }
 
 /* THE END */
