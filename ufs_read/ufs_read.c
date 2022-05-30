@@ -74,6 +74,9 @@
  *
  * There are 304 files on the root partition.
  * There are 1810 files on the usr partition.
+ * 
+ * The count of usr files includes usr/tom and usr/rich which will
+ * be removed soon after extraction.
  */
 
 
@@ -243,6 +246,7 @@ struct mem_inode
         time_t  atime;       /* time last accessed */
         time_t  mtime;       /* time last modified */
         time_t  ctime;       /* time created */
+	struct dinode orig;	/* XXX copy */
 };
 
 
@@ -438,13 +442,6 @@ fix_inode ( struct mem_inode *mp, struct dinode *dp, char *path, int debug )
 	mp->mtime = dp->di_mtime;
 	mp->ctime = dp->di_ctime;
 
-	/* Only directories and regular files have block lists.
-	 * Pipes don't exist in the filesystem.
-	 */
-	if ( ((mp->mode & IFMT) != IFDIR ) &&
-	    ((mp->mode & IFMT) != IFREG ) )
-		return;
-
 	bcount = 0;
 	for ( i=0; i<BYTES_INODE_ADDR; i += 3 ) {
 	    u = &dp->di_addr[i];
@@ -452,6 +449,20 @@ fix_inode ( struct mem_inode *mp, struct dinode *dp, char *path, int debug )
 	    if ( addr )
 		mp->addr[bcount++] = addr;
 	}
+
+	/* Premature, except for special files.
+	 * (which should have one block value set)
+	 */
+	mp->bcount = bcount;
+
+	/* Only directories and regular files have block lists.
+	 * Pipes don't exist in the filesystem.
+	 * Special files have the first block address set
+	 * and it contains the major/minor numbers.
+	 */
+	if ( ((mp->mode & IFMT) != IFDIR ) &&
+	    ((mp->mode & IFMT) != IFREG ) )
+		return;
 
 	if ( bcount > 10 )
 	    ind_block = mp->addr[10];
@@ -518,6 +529,9 @@ get_inode ( struct mem_inode *mp, int inode, char *path, int debug )
 
     disk_read ( (u_char *) iblock, block );
     fix_inode ( mp, &iblock[index], path, debug );
+
+    /* structure copy */
+    mp->orig = iblock[index];
 
     // printf ( "IPB = %d\n", INODES_PER_BLOCK );
 }
@@ -781,6 +795,73 @@ enter_dir ( char *path )
     }
 }
 
+
+/* If I cared a lot about doing this "right", I would build a table
+ * of name and inode and match up inode numbers and create symbolic
+ * links (probably).  I decide that it is too much work, and I am lazy
+ * and so I just print out the information here.  You can grep these
+ * lines and fairly easily fix things by hand if you wan to.
+ */
+void
+file_link ( int count, int inode, char *path )
+{
+    printf ( "FLINK: (count: %d) %d %s\n", count, inode, path );
+}
+
+/* This spits out a line for every regular file showing
+ * uid, gid, and possibly setuid status.
+ */
+void
+file_stuff ( char *path, struct mem_inode *ip )
+{
+    int uid, gid;
+    int is_setuid, is_setgid;
+
+    uid = ip->uid;
+    gid = ip->gid;
+
+    is_setgid = (ip->mode & ISGID) ? 'G' : '-';
+    is_setuid = (ip->mode & ISUID) ? 'U' : '-';
+
+    printf ( "FILE: %36s %2d %2d %c%c\n", path, uid, gid, is_setuid, is_setgid );
+}
+
+/* All special files are in /dev
+ * all are owned by root, group 1 ("daemon")
+ */
+void
+special ( char *path, struct mem_inode *ip )
+{
+    int type;
+    int dev;
+    int major, minor;
+    int i;
+
+    type = '?';
+    if ( ip->mode & IFCHR )
+	type = 'c';
+    if ( ip->mode & IFBLK )
+	type = 'b';
+
+    if ( ip->bcount > 0 )
+	dev = ip->addr[0];
+    else
+	dev = 0;
+
+    major = (dev >> 8)&0xff;
+    minor = dev & 0xff;
+
+    // printf ( "SPECIAL: mode %36s - %08x\n", path, ip->mode );
+    // printf ( "SPECIAL: addr %36s - bcount %d - %08x\n", path, ip->bcount, ip->addr[0] );
+
+    printf ( "SPECIAF: %36s %2d %2d\n", path, ip->uid, ip->gid );
+    printf ( "SPECIAL: %36s - mknod %c %2d %2d\n", path, type, major, minor );
+
+    // for ( i=0; i<ip->bcount; i++ )
+	//printf ( "SPECIAL: addr %36s - %2d %08x\n", path, i, ip->addr[i] );
+    // block_dump ( (u_char *) &ip->orig, sizeof(struct dinode) );
+}
+
 /* Global: statistics */
 int biggest_size = 0;
 char biggest_path[256];
@@ -861,22 +942,25 @@ walk_dir ( int inode, char *path, char *lpath )
 		biggest_size = entry_inode.size;
 		strcpy ( biggest_path, ent_path );
 	    }
-	    if ( entry_inode.nlink > 1 )
-		printf ( "DLINK: %d %s\n", entry_inode.nlink, ent_path );
+	    // if ( entry_inode.nlink > 1 )
+		// printf ( "DLINK: %d %s\n", entry_inode.nlink, ent_path );
 	} else if ( (entry_inode.mode & IFMT) == IFREG ) {
 	    num_files++;
 	    /* regular file */
 	    // printf ( "COPY file: %s\n", ent_path );
+	    file_stuff ( ent_path, &entry_inode );
 	    copy_file ( &entry_inode, m_dir.name );
+
 	    if ( entry_inode.size > biggest_size ) {
 		biggest_size = entry_inode.size;
 		strcpy ( biggest_path, ent_path );
 	    }
 	    if ( entry_inode.nlink > 1 )
-		printf ( "FLINK: %d %s\n", entry_inode.nlink, ent_path );
+		file_link ( entry_inode.nlink, m_dir.inode, ent_path );
 	} else {
 	    /* some kind of special file */
-	    printf ( "SPECIAL: %s\n", ent_path );
+	    // printf ( "SPECIAL: %s\n", ent_path );
+	    special ( ent_path, &entry_inode );
 	    if ( entry_inode.nlink > 1 )
 		printf ( "SLINK: %d %s\n", entry_inode.nlink, ent_path );
 	}
