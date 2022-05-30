@@ -1,8 +1,9 @@
+DONE: build file path during recursion x/y/z (use for links)
+DONE: unlink - does dirent end or skip zero inode entries
+
 link handling, table, symlinks
 inode fix - make linear list of indirect blocks
   (used for both big dirs and file copy)
-build file path during recursion x/y/z (use for links)
-unlink - does dirent end or skip zero inode entries
 duplicate filesystem -- mkdir, chdir, copy files
     - all owned by current user (tom)  ??
     - permissions and suid proper
