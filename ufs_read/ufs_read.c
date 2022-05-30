@@ -72,6 +72,8 @@
  *  Blocks 12512-17407  swap		 36 cylinders, 4896 blocks
  *  Blocks 17408-43519  partition "b"	192 cylinders, 26112 blocks
  *
+ * There are 1394 files on the root partition.
+ * There are 12496 files on the usr partition.
  */
 
 
@@ -81,6 +83,7 @@
 #include <fcntl.h>
 #include <string.h>
 #include <time.h>
+#include <sys/stat.h>
 
 //#include <endian.h>
 #include <arpa/inet.h>
@@ -104,7 +107,7 @@ int disk_fd;
 #define LIMIT_B		24208
 
 void error ( char * );
-void dump_fs ( int, int, int );
+void dump_fs ( char *, int, int, int );
 
 /* ----------------------------- */
 
@@ -122,6 +125,7 @@ error ( char *msg )
 static int offset;
 static int size;
 static int limit;
+static int num_files;
 
 void
 disk_offset ( int a_off, int a_size, int a_limit )
@@ -665,25 +669,73 @@ copy_file ( struct mem_inode *ip, char *path )
 	    printf ( "%20s (%8d): Tindirect\n", path, ip->size );
 }
 #endif
+
 void
-copy_file ( struct mem_inode *ip, char *path )
+copy_file ( struct mem_inode *mp, char *path )
 {
+	u_char buf[BSIZE];
+	int i;
+	int count;
+	int fd;
+	mode_t perms;
+	int xcount;
+
+	xcount = (mp->size + BSIZE - 1) / BSIZE;
+
+	if ( xcount != mp->bcount )
+	    printf ( "bcount fishy for %s -- %d %d\n", path, xcount, mp->bcount );
+
+#ifdef notdef
+	// perms = xxx;
+	fd = creat ( path, perms );
+	if ( fd < 0 ) {
+	    printf ( "Cannot create: %s\n", path );
+	    error ( "cannot create file" );
+	}
+
+	count = mp->bcount - 1;
+
+	for ( i=0; i<count; i++ ) {
+	    // printf ( "Copy %d\n", mp->addr[i] );
+	    disk_read ( buf, mp->addr[i] );
+	}
+
+	/* Only write part of this */
+	disk_read ( buf, count );
+
+	close ( fd );
+#endif
+}
+
+void
+enter_dir ( char *path )
+{
+    int s;
+
+    s = chdir ( path );
+    if ( s ) {
+	printf ( "cannot enter: %s\n", path );
+	error ( "Cannot enter directory" );
+    }
 }
 
 int biggest_size = 0;
 char biggest_path[256];
 
 void
-walk_dir ( int inode, char *path )
+walk_dir ( int inode, char *path, char *lpath )
 {
     struct mem_inode m_inode;
     struct mem_inode entry_inode;
     struct mem_direct m_dir;
     int entry;
     int code;
+    int s;
     char ent_path[256];
 
     // printf ( "Start walk for inode %d\n", inode );
+
+    enter_dir ( lpath );
 
     // show_inode ( inode );
 
@@ -704,6 +756,11 @@ walk_dir ( int inode, char *path )
 	strcpy ( ent_path, path );
 	strcat ( ent_path, "/" );
 	strcat ( ent_path, m_dir.name );
+
+	if ( strcmp ( m_dir.name, "." ) == 0 )
+	    continue;
+	if ( strcmp ( m_dir.name, ".." ) == 0 )
+		continue;
 
 	// printf ( "Fetch inode %d for %s\n", m_dir.inode, m_dir.name );
 	// show_inode ( m_dir.inode );
@@ -732,6 +789,11 @@ walk_dir ( int inode, char *path )
 #endif
 	if ( (entry_inode.mode & IFMT) == IFDIR ) {
 	    /* make the directory */
+	    s = mkdir ( m_dir.name, 0774 );
+	    if ( s ) {
+		printf ( "cannot create: %s\n", ent_path );
+		error ( "cannot create directory" );
+	    }
 	    if ( entry_inode.size > biggest_size ) {
 		biggest_size = entry_inode.size;
 		strcpy ( biggest_path, ent_path );
@@ -739,6 +801,7 @@ walk_dir ( int inode, char *path )
 	    if ( entry_inode.nlink > 1 )
 		printf ( "DLINK: %d %s\n", entry_inode.nlink, ent_path );
 	} else if ( (entry_inode.mode & IFMT) == IFREG ) {
+	    num_files++;
 	    /* regular file */
 	    copy_file ( &entry_inode, ent_path );
 	    if ( entry_inode.size > biggest_size ) {
@@ -778,7 +841,8 @@ walk_dir ( int inode, char *path )
 
 	if ( (entry_inode.mode & IFMT) == IFDIR ) {
 	    printf ( "Enter: %s\n", ent_path );
-	    walk_dir ( m_dir.inode, ent_path );
+	    walk_dir ( m_dir.inode, ent_path, m_dir.name );
+	    enter_dir ( ".." );
 	    printf ( "Done: %s\n", ent_path );
 	}
     }
@@ -789,9 +853,9 @@ walk_dir ( int inode, char *path )
 /* Start at the root and this should recurse through the entire filesystem
  */
 void
-walk_it ( void )
+walk_it ( char *path )
 {
-    walk_dir ( ROOT_INO, "." );
+    walk_dir ( ROOT_INO, path, path );
 
     printf ( "Biggest file: %d  %s\n", biggest_size, biggest_path );
 }
@@ -848,13 +912,14 @@ read_super ( void )
 
 
 void
-dump_fs ( int offset, int size, int limit )
+dump_fs ( char *start_path, int offset, int size, int limit )
 {
     disk_offset ( offset, size, limit );
     read_super ();
 
-    printf ( "Start Filesystem **************************\n" );
-    walk_it ();
+    // printf ( "Start Filesystem **************************\n" );
+    walk_it ( start_path );
+    printf ( "Found %d files\n", num_files );
 }
 
 int
@@ -866,10 +931,15 @@ main ( int argc, char **argv )
     argc--;
     argv++;
 
-    if ( argc > 1 ) {
+    // printf ( "argc = %d\n", argc );
+
+    if ( argc > 0 ) {
 	p = argv[0];
+	// printf ( "arg = %s\n", p );
 	if ( *p == 'b' || *p == 'B' )
 	    first = 0;
+    } else {
+	// printf ( "crazy\n" );
     }
 
     disk_fd = open ( disk_path, O_RDONLY );
@@ -877,9 +947,9 @@ main ( int argc, char **argv )
 	error ( "could not open disk image" );
 
     if ( first )
-	dump_fs ( OFFSET_A, SIZE_A, LIMIT_A );
+	dump_fs ( "root", OFFSET_A, SIZE_A, LIMIT_A );
     else
-	dump_fs ( OFFSET_B, SIZE_B, LIMIT_B );
+	dump_fs ( "usr", OFFSET_B, SIZE_B, LIMIT_B );
 
     return 0;
 }

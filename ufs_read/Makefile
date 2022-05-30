@@ -8,10 +8,19 @@ ufs_read:	ufs_read.c
 	$(CC) -o ufs_read ufs_read.c
 
 test:
+	(cd root ; rm -rf *)
+	(cd usr ; rm -rf *)
 	./ufs_read
+
+test2:
+	(cd root ; rm -rf *)
+	(cd usr ; rm -rf *)
+	./ufs_read b
 
 clean:
 	rm -f *.o ufs_read
+	(cd root ; rm -rf *)
+	(cd usr ; rm -rf *)
 
 # -------------------------------------
 
