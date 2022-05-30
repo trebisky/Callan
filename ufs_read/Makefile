@@ -17,10 +17,12 @@ test2:
 	(cd usr ; rm -rf *)
 	./ufs_read b
 
-clean:
-	rm -f *.o ufs_read
+fclean:
 	(cd root ; rm -rf *)
 	(cd usr ; rm -rf *)
+
+clean:
+	rm -f *.o ufs_read
 
 # -------------------------------------
 
