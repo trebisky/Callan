@@ -1,0 +1,31 @@
+This is a list of the hard links on the root partition.
+[tom@trona ufs_read]$ make test | grep LINK
+FLINK: (count: 4) 12 root/bin/lx
+FLINK: (count: 4) 12 root/bin/lf
+FLINK: (count: 4) 12 root/bin/ls
+FLINK: (count: 2) 11 root/bin/mail
+FLINK: (count: 2) 3 root/bin/more
+FLINK: (count: 2) 169 root/bin/test
+FLINK: (count: 2) 133 root/bin/cdc
+FLINK: (count: 2) 133 root/bin/rmdel
+FLINK: (count: 2) 127 root/bin/unget
+FLINK: (count: 2) 127 root/bin/sact
+FLINK: (count: 2) 3 root/bin/page
+FLINK: (count: 2) 11 root/bin/rmail
+FLINK: (count: 2) 169 root/bin/[
+FLINK: (count: 4) 12 root/bin/l
+FLINK: (count: 3) 267 root/bin/vi
+FLINK: (count: 3) 267 root/bin/ex
+FLINK: (count: 3) 267 root/bin/edit
+SLINK: 2 root/dev/rw0swap
+SLINK: 2 root/dev/swap
+
+And here is the list for the usr partition
+
+[tom@trona ufs_read]$ make test2 | grep LINK
+FLINK: (count: 2) 197 usr/lib/tabset/vt100
+FLINK: (count: 2) 197 usr/lib/tabset/cd100
+FLINK: (count: 3) 1247 usr/cdsbin/diskstat
+FLINK: (count: 3) 1247 usr/cdsbin/fdiskstat
+FLINK: (count: 3) 1247 usr/cdsbin/wdiskstat
+
