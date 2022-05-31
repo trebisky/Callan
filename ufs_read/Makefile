@@ -9,11 +9,9 @@ ufs_read:	ufs_read.c
 
 test:
 	(cd root ; rm -rf *)
-	(cd usr ; rm -rf *)
 	./ufs_read
 
 test2:
-	(cd root ; rm -rf *)
 	(cd usr ; rm -rf *)
 	./ufs_read b
 
